@@ -91,6 +91,29 @@ def test_customer_payment_types(client):
     assert types == ["advance", "partial", "final"]
 
 
+def test_paste_player_list_creates_items(client):
+    from app.models import OrderItem
+    from tests.test_sizes import TEAM_SHEET
+
+    client.post("/customers/new", data={"name": "Houston Spartans"})
+    client.post("/orders/new", data={"customer_id": "1", "title": "Jerseys"})
+    client.post("/orders/1/items/new", data={"name": "Jersey, Half sleeve", "price_type": "per_piece", "unit_price": "450"})
+    r = client.post("/orders/1/players/paste", data={"rows": TEAM_SHEET, "jersey_item": "Jersey", "track_item": "Track pants"})
+    assert r.status_code == 302
+    items = {i.name: i for i in db.session.query(OrderItem).all()}
+    assert set(items) == {"Jersey, Half sleeve", "Jersey, Full sleeve", "Track pants"}   # Loki: pants only
+    assert items["Jersey, Half sleeve"].unit_price == 450                      # existing item reused
+    assert [s.player_name for s in items["Jersey, Full sleeve"].sizes] == ["MUSTAQ", "KARTHIK"]
+    assert [s.size for s in items["Track pants"].sizes] == ["L", "XL", "M"]
+    page = client.get("/orders/1?tab=items").get_data(as_text=True)
+    assert "Added 4 players" in page and "Pant count (3) does not match jersey count (3)" not in page
+
+    client.post("/orders/1/players/paste", data={"rows": TEAM_SHEET, "mode": "replace"})
+    db.session.expire_all()
+    assert len(db.session.get(OrderItem, items["Track pants"].id).sizes) == 3   # replaced, not doubled
+    assert client.post("/orders/1/players/paste", data={"rows": "no header here"}).status_code == 302
+
+
 def test_stop_page(client):
     r = client.post("/settings/stop")
     assert r.status_code == 200 and "has stopped" in r.get_data(as_text=True)

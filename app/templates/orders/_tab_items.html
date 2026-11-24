@@ -1,6 +1,43 @@
 <datalist id="size-scale">{% for s in scale %}<option value="{{ s }}">{% endfor %}</datalist>
 <div class="row g-3">
   <div class="col-xl-8">
+    <div class="card mb-3 border-warning-subtle" id="player-list">
+      <div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">Paste the team's player list</span>
+          <button class="btn btn-sm {{ 'btn-brand' if not order.items else 'btn-outline-secondary' }}" type="button" data-bs-toggle="collapse" data-bs-target="#player-paste">
+            {{ 'Paste player list' if not order.items else 'Paste another list' }}
+          </button>
+        </div>
+        <div class="collapse {{ 'show' if not order.items }}" id="player-paste">
+          <form method="post" action="{{ url_for('orders.players_paste', order_id=order.id) }}" class="mt-2">
+            <textarea name="rows" rows="7" class="form-control form-control-sm font-monospace" required
+                      placeholder="In Excel, select the header row and all players, copy (Ctrl+C) and paste here (Ctrl+V).&#10;P.NO | Name | Name on Jersey | Number on Jersey | T Shirt Size | Tshirt Sleeve | Track Size"></textarea>
+            <div class="row g-2 align-items-end mt-1">
+              <div class="col-md-3">
+                <label class="form-label">Jersey item name</label>
+                <input name="jersey_item" class="form-control form-control-sm" value="Jersey">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Track item name</label>
+                <input name="track_item" class="form-control form-control-sm" value="Track pants">
+              </div>
+              <div class="col-md-4 small">
+                <label class="d-block"><input type="radio" name="mode" value="append" checked> Add to existing rows</label>
+                <label class="d-block"><input type="radio" name="mode" value="replace"> Replace rows of these items</label>
+              </div>
+              <div class="col-md-2"><button class="btn btn-sm btn-brand w-100">Add players</button></div>
+            </div>
+            <p class="small text-muted mt-2 mb-0">
+              Uses <strong>Name on Jersey</strong> (or Name), <strong>Number on Jersey</strong> (P.No only if there is no jersey number),
+              <strong>T Shirt Size</strong> for jerseys, <strong>Tshirt Sleeve</strong> to split jerseys into items (e.g. “Jersey, Half sleeve”, “Jersey, Full sleeve”)
+              and <strong>Track Size</strong> for a “Track pants” item. Missing items are created; then set their rates.
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
+
     {% for item in order.items %}
     <div class="card mb-3" id="item-{{ item.id }}">
       <div class="card-body">

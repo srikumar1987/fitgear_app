@@ -14,7 +14,10 @@ from ..models import (
     Adjustment, AllocationLine, Customer, Order, OrderItem, Quotation, SizeRow, Transaction, Vendor, VendorAllocation, audit,
 )
 from ..money import alloc_due, alloc_paid, customer_payment_type, order_money
-from ..sizes import get_scale, normalise_size, parse_paste, size_summary, validate_order
+from ..sizes import (
+    get_scale, is_bottom_wear, normalise_size, parse_paste, parse_player_list, size_summary, sleeve_label,
+    validate_order,
+)
 from .designs import remove_stored
 from .common import (
     apply_form, choice, date_or_none, error, get_by_id, int_min0, money, money_or_none, saved, text,
@@ -283,7 +286,7 @@ def size_add(item_id: int):
 @bp.post("/items/<int:item_id>/sizes/paste")
 def size_paste(item_id: int):
     item = db.get_or_404(OrderItem, item_id)
-    rows = parse_paste(request.form.get("rows", ""))
+    rows = parse_paste(request.form.get("rows", ""), bottom_wear=is_bottom_wear(item.name))
     if not rows:
         flash("Nothing to add. Copy the rows from Excel and paste them into the box.", "danger")
         return _back(item.order, "items", f"item-{item.id}")
@@ -296,6 +299,54 @@ def size_paste(item_id: int):
     db.session.commit()
     flash(f"Added {len(rows)} size rows to {item.name}", "success")
     return _back(item.order, "items", f"item-{item.id}")
+
+
+@bp.post("/orders/<int:order_id>/players/paste")
+def players_paste(order_id: int):
+    """Whole team list in one paste: jerseys split into items by sleeve, plus a track pants item."""
+    order = db.get_or_404(Order, order_id)
+    players = parse_player_list(request.form.get("rows", ""))
+    if players is None:
+        flash("Could not find the header row. Copy the header (P.NO, Name, Name on Jersey, Number on Jersey, "
+              "T Shirt Size, Tshirt Sleeve, Track Size) together with the players.", "danger")
+        return _back(order, "items")
+    if not players:
+        flash("Found the header but no players under it.", "danger")
+        return _back(order, "items")
+
+    jersey_base = text(request.form.get("jersey_item")) or "Jersey"
+    track_name = text(request.form.get("track_item")) or "Track pants"
+    groups: dict[str, list[dict]] = {}
+    for p in players:
+        row = {"player_name": p["player_name"], "number": p["number"], "qty": p["qty"]}
+        if p["size"] or not p["track_size"]:
+            label = sleeve_label(p["sleeve"])
+            groups.setdefault(f"{jersey_base}, {label}" if label else jersey_base, []).append({**row, "size": p["size"]})
+        if p["track_size"]:
+            groups.setdefault(track_name, []).append({**row, "size": p["track_size"]})
+
+    existing = {i.name.strip().lower(): i for i in order.items}
+    replace, created, summary = request.form.get("mode") == "replace", [], []
+    for name, rows in groups.items():
+        item = existing.get(name.lower())
+        if item is None:
+            item = OrderItem(order=order, name=name, price_type="per_piece", position=len(order.items))
+            db.session.add(item)
+            existing[name.lower()] = item
+            created.append(name)
+        elif replace:
+            item.sizes.clear()
+            db.session.flush()
+        start = len(item.sizes)
+        for offset, row in enumerate(rows):
+            db.session.add(SizeRow(item=item, position=start + offset, **row))
+        summary.append(f"{name} ({sum(r['qty'] for r in rows)})")
+    db.session.commit()
+    message = f"Added {len(players)} players: " + ", ".join(summary) + "."
+    if created:
+        message += f" New items: {', '.join(created)}. Set their rates below."
+    flash(message, "success")
+    return _back(order, "items")
 
 
 @bp.post("/items/<int:item_id>/sizes/clear")
