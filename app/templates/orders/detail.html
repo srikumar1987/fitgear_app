@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ order.number }} · {{ order.title }}{% endblock %}
+{% block content %}
+{% set update_url = url_for('orders.order_update', order_id=order.id) %}
+<div class="order-header">
+  <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap mb-2">
+    <div class="flex-grow-1" style="min-width: 280px; max-width: 560px">
+      <div class="small text-muted"><a href="{{ url_for('orders.list_orders') }}">Orders</a> / {{ order.number }} · <a href="{{ url_for('directory.index', q=order.customer.name) }}">{{ order.customer.name }}</a></div>
+      <input class="form-control title-input" name="title" value="{{ order.title }}" aria-label="Order title"
+             hx-post="{{ update_url }}" hx-trigger="change" hx-swap="none">
+    </div>
+    <div class="fields d-flex gap-2 flex-wrap">
+      <label>Status
+        <select name="status" class="form-select form-select-sm" hx-post="{{ update_url }}" hx-trigger="change" hx-swap="none">
+          {% for s in statuses %}<option {{ 'selected' if s == order.status }}>{{ s }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Order date
+        <input type="date" name="order_date" class="form-control form-control-sm" value="{{ order.order_date|iso }}" hx-post="{{ update_url }}" hx-trigger="change" hx-swap="none">
+      </label>
+      <label>Delivery
+        <input type="date" name="delivery_date" class="form-control form-control-sm" value="{{ order.delivery_date|iso }}" hx-post="{{ update_url }}" hx-trigger="change" hx-swap="none">
+      </label>
+      <label title="Leave blank to use the delivery date">Payment due
+        <input type="date" name="payment_due_date" class="form-control form-control-sm" value="{{ order.payment_due_date|iso }}" hx-post="{{ update_url }}" hx-trigger="change" hx-swap="none">
+      </label>
+    </div>
+  </div>
+  {% include "orders/_strip.html" %}
+</div>
+
+<nav class="tabs">
+  {% for key, label in tabs %}
+    <a class="{{ 'active' if key == tab }}" href="{{ url_for('orders.detail', order_id=order.id, tab=key) }}">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+{% include "orders/_tab_" ~ tab ~ ".html" %}
+{% endblock %}

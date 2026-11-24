@@ -1,0 +1,45 @@
+<div hx-get="{{ url_for('orders.sizes_summary', order_id=order.id) }}" hx-trigger="moneyChanged from:body" hx-swap="outerHTML">
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="card-title">Size summary</h2>
+      {% if summary.items %}
+      <table class="table table-sm">
+        <thead><tr>
+          <th>Size</th>
+          {% for it in summary.items %}<th class="num" title="{{ it.name }}">{{ it.name|truncate(14, true, '…') }}</th>{% endfor %}
+          <th class="num">Total</th>
+        </tr></thead>
+        <tbody>
+        {% for size in summary.sizes %}
+          <tr>
+            <td class="fw-semibold">{{ size }}</td>
+            {% for it in summary.items %}<td class="num">{{ summary.cells.get((size, it.id), 0) or '-' }}</td>{% endfor %}
+            <td class="num fw-semibold">{{ summary.size_totals[size] }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr>
+          <th>Total</th>
+          {% for it in summary.items %}<th class="num">{{ summary.item_totals[it.id] }}</th>{% endfor %}
+          <th class="num">{{ summary.grand_total }}</th>
+        </tr></tfoot>
+      </table>
+      {% else %}
+      <p class="text-muted small mb-0">Size totals appear here once you add size rows.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <h2 class="card-title">Checks</h2>
+      {% if warnings %}
+        <ul class="warnings small">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+        <p class="small text-muted mt-2 mb-0">These are warnings only. Nothing is blocked.</p>
+      {% elif summary.items %}
+        <p class="text-paid small mb-0">No problems found.</p>
+      {% else %}
+        <p class="text-muted small mb-0">Duplicate numbers, missing sizes and other problems will show here.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1 class="page-title mb-3">Settings</h1>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="card-title">Size scale</h2>
+        <p class="small text-muted">Shared by jerseys and track pants, in display order. 3XL is read as XXXL, 2XL as XXL.</p>
+        <form method="post" action="{{ url_for('settings.save_sizes') }}" class="d-flex gap-2">
+          <input name="scale" class="form-control form-control-sm" value="{{ scale }}">
+          <button class="btn btn-sm btn-brand">Save</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="card-title">Export</h2>
+        <p class="small text-muted">Everything (orders, sizes, vendors, payments, audit log) in one Excel file.</p>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.export') }}">Download Excel export</a>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="card-title">Stop the app</h2>
+        <p class="small text-muted">The app runs in the background (no black window). Stop it here before shutting down the PC or copying the database. A backup is saved first. Start it again with <strong>start.bat</strong>.</p>
+        <form method="post" action="{{ url_for('settings.stop') }}" data-confirm="Stop TUR fitgear now?"><button class="btn btn-sm btn-outline-danger">Stop the app</button></form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">Change password</h2>
+        <form method="post" action="{{ url_for('settings.change_password') }}" class="row g-2">
+          <div class="col-md-4"><input name="current" type="password" class="form-control form-control-sm" placeholder="Current" required></div>
+          <div class="col-md-4"><input name="new" type="password" class="form-control form-control-sm" placeholder="New" minlength="6" required></div>
+          <div class="col-md-4"><input name="confirm" type="password" class="form-control form-control-sm" placeholder="New again" minlength="6" required></div>
+          <div class="col-12 text-end"><button class="btn btn-sm btn-outline-secondary">Change password</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">Backups</h2>
+        <p class="small text-muted mb-2">A copy is made automatically when the app starts and once a day. The last 30 are kept.</p>
+        <dl class="small row mb-2">
+          <dt class="col-sm-3">Backup folder</dt><dd class="col-sm-9 text-break">{{ backup_dir }}</dd>
+          <dt class="col-sm-3">Live database</dt><dd class="col-sm-9 text-break">{{ data_dir }}</dd>
+        </dl>
+        <form method="post" action="{{ url_for('settings.backup_now') }}" class="mb-3"><button class="btn btn-sm btn-brand">Back up now</button></form>
+        <table class="table table-sm">
+          <thead><tr><th>Latest backups</th><th>Time</th><th class="num">Size</th></tr></thead>
+          <tbody>
+          {% for b in backups %}
+            <tr><td class="small">{{ b.name }}</td><td class="small">{{ b.time.strftime('%d %b %Y %H:%M') }}</td><td class="num small">{{ b.size_kb }} KB</td></tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted small">No backups yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="small text-muted mb-0">To restore: close the app, copy a backup file over <code>tur_fitgear.db</code> in the live database folder, then start the app again.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

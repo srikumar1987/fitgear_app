@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="page-title">Orders</h1>
+  <a class="btn btn-brand btn-sm" href="{{ url_for('orders.new_order') }}">+ New order</a>
+</div>
+
+<div class="chips mb-3">
+  <a class="chip {{ 'active' if not status }}" href="{{ url_for('orders.list_orders', q=q or None) }}">All <span class="count">{{ counts.values()|sum }}</span></a>
+  {% for s in statuses %}
+    <a class="chip {{ 'active' if status == s }}" href="{{ url_for('orders.list_orders', status=s, q=q or None) }}">{{ s }} <span class="count">{{ counts.get(s, 0) }}</span></a>
+  {% endfor %}
+</div>
+
+{% if rows %}
+<div class="table-card">
+  <table class="table table-hover">
+    <thead><tr>
+      <th>Order</th><th>Title</th><th>Customer</th><th>Status</th><th>Delivery</th>
+      <th class="num">Billed</th><th class="num">Pending</th><th class="num">Vendor due</th><th class="num">Profit</th>
+    </tr></thead>
+    <tbody>
+    {% for o, m in rows %}
+      <tr class="row-link" onclick="location.href='{{ url_for('orders.detail', order_id=o.id) }}'">
+        <td class="fw-semibold text-nowrap"><a href="{{ url_for('orders.detail', order_id=o.id) }}" class="text-reset">{{ o.number }}</a></td>
+        <td>{{ o.title }}</td>
+        <td>{{ o.customer.name }}</td>
+        <td><span class="status {{ o.status|status_class }}">{{ o.status }}</span></td>
+        <td class="text-nowrap {{ o.delivery_date|due_class if o.status not in ('Delivered', 'Closed') else 'text-muted' }}">{{ o.delivery_date|d }}</td>
+        <td class="num">{{ m.billed|inr }}</td>
+        <td class="num fw-semibold {{ o.due_date|due_class if m.outstanding > 0 else 'text-muted' }}">{{ m.outstanding|inr }}</td>
+        <td class="num {{ 'text-overdue' if m.vendor_due > 0 else 'text-muted' }}">{{ m.vendor_due|inr }}</td>
+        <td class="num">{{ m.actual_profit|inr }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page.pages > 1 %}
+<nav class="d-flex justify-content-between align-items-center mt-3 small">
+  <span class="text-muted">Page {{ page.page }} of {{ page.pages }} · {{ page.total }} orders</span>
+  <span class="d-flex gap-2">
+    {% if page.has_prev %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('orders.list_orders', page=page.prev_num, q=q or None, status=status or None) }}">← Newer</a>{% endif %}
+    {% if page.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('orders.list_orders', page=page.next_num, q=q or None, status=status or None) }}">Older →</a>{% endif %}
+  </span>
+</nav>
+{% endif %}
+{% else %}
+<div class="card"><div class="empty">
+  {% if q or status %}No orders match.{% else %}No orders yet. Create your first one.{% endif %}
+  <div><a class="btn btn-brand btn-sm" href="{{ url_for('orders.new_order') }}">+ New order</a></div>
+</div></div>
+{% endif %}
+{% endblock %}

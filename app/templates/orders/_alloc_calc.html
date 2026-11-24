@@ -1,0 +1,5 @@
+<td class="num small" hx-get="{{ url_for('orders.allocation_calc', allocation_id=a.id) }}" hx-trigger="moneyChanged from:body" hx-swap="outerHTML">
+  <div>Paid {{ paid|inr }}</div>
+  <div class="fw-semibold {{ a.effective_due_date|due_class if due > 0 else 'text-paid' }}">{{ 'Due ' ~ (due|inr) if due > 0 else ('Settled' if due == 0 else 'Overpaid ' ~ ((-due)|inr)) }}</div>
+  {% if due > 0 and a.effective_due_date %}<div class="{{ a.effective_due_date|due_class }}">{{ a.effective_due_date|due_label }}</div>{% endif %}
+</td>

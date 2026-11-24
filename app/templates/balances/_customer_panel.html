@@ -1,0 +1,32 @@
+<h5 class="mb-1">{{ customer.name }}</h5>
+<div class="text-muted small mb-3">{{ customer.phone or 'No phone' }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+<div class="d-flex gap-2 mb-4">
+  <a class="btn btn-sm btn-brand" href="{{ url_for('payments.receive', customer_id=customer.id) }}">Receive payment</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('payments.customer_statement', customer_id=customer.id) }}">Statement</a>
+</div>
+
+<h6 class="text-uppercase small text-muted">Open orders</h6>
+{% for o, m in orders %}
+  <a class="d-block border rounded p-2 mb-2 text-decoration-none text-reset" href="{{ url_for('orders.detail', order_id=o.id, tab='payments') }}">
+    <div class="d-flex justify-content-between">
+      <span class="fw-semibold">{{ o.number }} · {{ o.title }}</span>
+      <span class="fw-bold num {{ o.due_date|due_class if m.outstanding > 0 }}">{{ m.outstanding|inr }}</span>
+    </div>
+    <div class="small text-muted d-flex justify-content-between">
+      <span>Billed {{ m.billed|inr }} · Received {{ m.received_net|inr }}</span>
+      <span class="{{ o.due_date|due_class if m.outstanding > 0 }}">{{ o.due_date|due_label if m.outstanding > 0 else 'Credit' }}</span>
+    </div>
+  </a>
+{% else %}
+  <p class="text-muted small">No open orders.</p>
+{% endfor %}
+
+<h6 class="text-uppercase small text-muted mt-4">Recent payments</h6>
+{% for t in payments %}
+  <div class="d-flex justify-content-between small border-bottom py-1">
+    <span>{{ t.date|d }} · {{ t.order.number }} · {{ t.type_label }}{% if t.mode %} · {{ t.mode }}{% endif %}</span>
+    <span class="num {{ 'text-paid' if t.direction == 'in' else 'text-overdue' }}">{{ '' if t.direction == 'in' else '-' }}{{ t.amount|inr }}</span>
+  </div>
+{% else %}
+  <p class="text-muted small">No payments yet.</p>
+{% endfor %}

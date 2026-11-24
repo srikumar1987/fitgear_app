@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Old reports{% endblock %}
+{% block content %}
+{% macro pct(value) %}{{ '%.1f'|format(value) ~ '%' if value is not none else '-' }}{% endmacro %}
+{% macro amt(value) %}{{ value|inr if value is not none else '-' }}{% endmacro %}
+<h1 class="page-title mb-2">Reports</h1>
+{% include "reports/_tabs.html" %}
+
+<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+  <p class="small text-muted mb-0">Orders from before you started using the app, imported from your old Excel sheets. They are for reference only and do not affect Balances.</p>
+  <div class="d-flex gap-2">
+    {% if imports %}
+    <form method="get" class="d-flex gap-2">
+      {% if year %}<input type="hidden" name="year" value="{{ year }}">{% endif %}
+      <input name="q" type="search" class="form-control form-control-sm" placeholder="Filter" value="{{ q }}">
+    </form>
+    {% endif %}
+    <a class="btn btn-sm btn-brand text-nowrap" href="{{ url_for('reports.old_upload') }}">Import Excel</a>
+  </div>
+</div>
+
+{% if imports %}
+<div class="chips mb-3">
+  <a class="chip {{ 'active' if not year }}" href="{{ url_for('reports.old', q=q or None) }}">All years</a>
+  {% for y in years %}<a class="chip {{ 'active' if year == y }}" href="{{ url_for('reports.old', year=y, q=q or None) }}">{{ y }}</a>{% endfor %}
+</div>
+
+<div class="metric-row mb-3">
+  <div class="metric"><div class="label">Orders</div><div class="value">{{ overall.rows|length }}</div></div>
+  <div class="metric"><div class="label">Billed</div><div class="value">{{ overall.billed|inr }}</div></div>
+  <div class="metric"><div class="label">Spent</div><div class="value">{{ overall.spent|inr }}</div></div>
+  <div class="metric"><div class="label">Received</div><div class="value text-paid">{{ overall.received|inr }}</div></div>
+  <div class="metric"><div class="label">Profit</div><div class="value {{ 'text-overdue' if overall.profit < 0 }}">{{ overall.profit|inr }}</div><div class="hint">{{ pct(overall.margin) }} of billed</div></div>
+</div>
+
+{% for g in groups %}
+<details class="year-group mb-3" open>
+  <summary>
+    <span class="year">{{ g.year }}</span>
+    <span class="text-muted">{{ g.rows|length }} order{{ 's' if g.rows|length != 1 }}</span>
+    <span class="ms-auto small">Received <strong class="text-paid">{{ g.received|inr }}</strong> · Profit <strong>{{ g.profit|inr }}</strong> ({{ pct(g.margin) }})</span>
+  </summary>
+  <div class="table-card">
+    <table class="table">
+      <thead><tr>
+        <th class="num" style="width: 50px">S.No</th><th>ID</th><th>Order</th><th>What was ordered</th><th>Order date</th>
+        <th class="num">Billed</th><th class="num">Spent</th><th class="num">Received</th><th class="num">Profit</th><th class="num">Profit %</th>
+      </tr></thead>
+      <tbody>
+      {% for r in g.rows %}
+        {% set m = (r.profit / r.billed * 100) if r.profit is not none and r.billed else none %}
+        <tr>
+          <td class="num text-muted">{{ loop.index }}</td>
+          <td class="text-nowrap fw-semibold">{{ r.ref or '-' }}</td>
+          <td>{{ r.name }}{% if r.customer and r.customer != r.name %}<div class="small text-muted">{{ r.customer }}</div>{% endif %}</td>
+          <td class="small">{{ r.items or '-' }}</td>
+          <td class="text-nowrap">{{ r.order_date|d }}</td>
+          <td class="num">{{ amt(r.billed) }}</td>
+          <td class="num">{{ amt(r.spent) }}</td>
+          <td class="num text-paid">{{ amt(r.received) }}</td>
+          <td class="num fw-semibold {{ 'text-overdue' if r.profit is not none and r.profit < 0 }}">{{ amt(r.profit) }}</td>
+          <td class="num">{{ pct(m) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr class="fw-bold">
+        <td colspan="5">Total {{ g.year }}</td>
+        <td class="num">{{ g.billed|inr }}</td><td class="num">{{ g.spent|inr }}</td>
+        <td class="num text-paid">{{ g.received|inr }}</td><td class="num">{{ g.profit|inr }}</td><td class="num">{{ pct(g.margin) }}</td>
+      </tr></tfoot>
+    </table>
+  </div>
+</details>
+{% else %}
+<div class="card mb-3"><div class="empty">Nothing matches.</div></div>
+{% endfor %}
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="card-title">Imported files</h2>
+    {% for i in imports %}
+      <div class="d-flex justify-content-between align-items-center border-bottom py-1 small">
+        <span>{{ i.filename }}{% if i.sheet and i.sheet != 'CSV' %} · sheet “{{ i.sheet }}”{% endif %} · {{ i.orders|length }} rows · imported {{ i.imported_at|d }}</span>
+        <form method="post" action="{{ url_for('reports.old_delete', import_id=i.id) }}" data-confirm="Remove all {{ i.orders|length }} rows imported from {{ i.filename }}? You can import the file again afterwards.">
+          <button class="btn btn-sm btn-link text-danger p-0">Remove</button>
+        </form>
+      </div>
+    {% endfor %}
+    <p class="small text-muted mt-2 mb-0">Made a mistake? Remove the import, fix the sheet or the column choices, and import again.</p>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  No old orders yet. Import your earlier Excel sheet to see past years here.
+  <div><a class="btn btn-brand btn-sm" href="{{ url_for('reports.old_upload') }}">Import Excel</a></div>
+</div></div>
+{% endif %}
+{% endblock %}

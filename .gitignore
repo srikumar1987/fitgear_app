@@ -1,0 +1,22 @@
+# Real business data: never commit
+backups/
+uploads/
+*.db
+*.db-journal
+*.log
+secret.key
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.venv/
+venv/
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

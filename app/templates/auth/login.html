@@ -1,0 +1,9 @@
+{% extends "auth/_layout.html" %}
+{% block card %}
+<h1 class="h5 text-center mb-3">TUR fitgear</h1>
+<form method="post">
+  <label class="form-label" for="password">Password</label>
+  <input id="password" name="password" type="password" class="form-control mb-3" required autofocus>
+  <button class="btn btn-brand w-100">Log in</button>
+</form>
+{% endblock %}

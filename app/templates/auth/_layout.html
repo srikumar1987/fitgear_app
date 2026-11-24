@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TUR fitgear</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/turtle.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <img src="{{ url_for('static', filename='img/turtle.png') }}" alt="">
+    {% block card %}{% endblock %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' }} py-2 mt-3 mb-0 small">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</div>
+</body>
+</html>

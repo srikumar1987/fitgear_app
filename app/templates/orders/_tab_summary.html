@@ -1,0 +1,77 @@
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="card-title">What was ordered and who is making it</h2>
+        {% for item in order.items %}
+          <div class="border-bottom py-2">
+            <div class="d-flex justify-content-between">
+              <span class="fw-semibold">{{ item.name }}</span>
+              <span class="num">{{ item.qty }} pcs · {{ item.line_total|inr }}</span>
+            </div>
+            {% for a in item.allocations %}
+              <div class="small d-flex justify-content-between">
+                <span>{{ a.vendor.name }} · {{ a.agreed_total|inr }}</span><span class="status {{ a.status|status_class }}">{{ a.status }}</span>
+              </div>
+              {% if a.lines %}
+                <div class="small text-muted ms-2">{% for line in a.lines %}{{ line.label }} {{ line.qty }} × {{ line.rate|inr }}{{ ', ' if not loop.last }}{% endfor %}</div>
+              {% endif %}
+            {% else %}
+              <div class="small text-soon">No vendor allocated</div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted small mb-0">No items yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% set designs = order.files|selectattr('kind', 'equalto', 'design')|list %}
+    {% set printed = order.files|selectattr('kind', 'equalto', 'printed')|list %}
+    <a class="card mb-3 text-decoration-none text-reset" href="{{ url_for('orders.detail', order_id=order.id, tab='designs') }}">
+      <div class="card-body d-flex justify-content-between small">
+        <span><strong>Designs:</strong> {{ designs|length }}
+          {% if designs %}· {% if designs|selectattr('approved')|list %}<span class="text-paid">approved ✓</span>{% else %}<span class="text-soon">none approved</span>{% endif %}{% endif %}</span>
+        <span><strong>After-print photos:</strong> {{ printed|length }}</span>
+      </div>
+    </a>
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">Notes</h2>
+        <textarea name="notes" class="form-control form-control-sm" rows="4" placeholder="Anything to remember about this order"
+                  hx-post="{{ url_for('orders.order_update', order_id=order.id) }}" hx-trigger="change" hx-swap="none">{{ order.notes }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="card-title">Money</h2>
+        <table class="table table-sm">
+          <tbody>
+            <tr><td>Approved quotation</td><td class="num">{{ m.quoted_total|inr if m.has_approved else 'Not approved (draft ' ~ (m.items_total|inr) ~ ')' }}</td></tr>
+            <tr><td>+ Extra charges</td><td class="num">{{ m.charges|inr }}</td></tr>
+            <tr><td>− Discounts</td><td class="num">{{ m.discounts|inr }}</td></tr>
+            <tr class="fw-semibold"><td>= Billed</td><td class="num">{{ m.billed|inr }}</td></tr>
+            <tr><td>Received (after refunds)</td><td class="num text-paid">{{ m.received_net|inr }}</td></tr>
+            <tr class="fw-bold"><td>Pending from customer</td><td class="num {{ order.due_date|due_class if m.outstanding > 0 }}">{{ m.outstanding|inr }}</td></tr>
+            <tr><td colspan="2" class="pt-3"></td></tr>
+            <tr><td>Vendor cost <span class="small text-muted">(actual, or agreed until actual is entered)</span></td><td class="num">{{ m.vendor_cost|inr }}</td></tr>
+            <tr><td>Paid to vendors</td><td class="num">{{ m.vendor_paid|inr }}</td></tr>
+            <tr class="fw-bold"><td>Vendor due</td><td class="num {{ 'text-overdue' if m.vendor_due > 0 }}">{{ m.vendor_due|inr }}</td></tr>
+            <tr><td>Expenses</td><td class="num">{{ m.expenses|inr }}</td></tr>
+            <tr><td colspan="2" class="pt-3"></td></tr>
+            <tr><td>Expected profit <span class="small text-muted">(quotation − agreed vendor cost)</span></td><td class="num">{{ m.expected_profit|inr }}</td></tr>
+            <tr class="fw-bold fs-6"><td>Actual profit <span class="small text-muted fw-normal">(billed − vendor cost − expenses)</span></td><td class="num {{ 'text-paid' if m.actual_profit > 0 else 'text-overdue' }}">{{ m.actual_profit|inr }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="d-flex gap-2 justify-content-end">
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('payments.customer_statement', customer_id=order.customer_id) }}">Customer statement</a>
+      <form method="post" action="{{ url_for('orders.order_delete', order_id=order.id) }}" data-confirm="Delete {{ order.number }} completely? This cannot be undone.">
+        <button class="btn btn-sm btn-outline-danger">Delete order</button>
+      </form>
+    </div>
+  </div>
+</div>

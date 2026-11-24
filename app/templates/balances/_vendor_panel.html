@@ -1,0 +1,32 @@
+<h5 class="mb-1">{{ vendor.name }}</h5>
+<div class="text-muted small mb-3">{{ vendor.phone or 'No phone' }} · Credit {{ vendor.credit_days }} days</div>
+<div class="d-flex gap-2 mb-4">
+  <a class="btn btn-sm btn-brand" href="{{ url_for('payments.pay', vendor_id=vendor.id) }}">Pay vendor</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('payments.vendor_statement', vendor_id=vendor.id) }}">Statement</a>
+</div>
+
+<h6 class="text-uppercase small text-muted">Open items</h6>
+{% for a, due in allocations %}
+  <a class="d-block border rounded p-2 mb-2 text-decoration-none text-reset" href="{{ url_for('orders.detail', order_id=a.item.order.id, tab='vendors') }}">
+    <div class="d-flex justify-content-between">
+      <span class="fw-semibold">{{ a.item.order.number }} · {{ a.item.name }}</span>
+      <span class="fw-bold num {{ a.effective_due_date|due_class if due > 0 }}">{{ due|inr }}</span>
+    </div>
+    <div class="small text-muted d-flex justify-content-between">
+      <span>{{ a.item.order.customer.name }} · {{ a.status }} · Cost {{ a.cost|inr }}</span>
+      <span class="{{ a.effective_due_date|due_class if due > 0 }}">{{ a.effective_due_date|due_label if due > 0 else 'Overpaid' }}</span>
+    </div>
+  </a>
+{% else %}
+  <p class="text-muted small">Nothing due.</p>
+{% endfor %}
+
+<h6 class="text-uppercase small text-muted mt-4">Recent payments</h6>
+{% for t in payments %}
+  <div class="d-flex justify-content-between small border-bottom py-1">
+    <span>{{ t.date|d }} · {{ t.order.number }}{% if t.allocation %} · {{ t.allocation.item.name }}{% endif %}{% if t.mode %} · {{ t.mode }}{% endif %}</span>
+    <span class="num text-overdue">{{ t.amount|inr }}</span>
+  </div>
+{% else %}
+  <p class="text-muted small">No payments yet.</p>
+{% endfor %}

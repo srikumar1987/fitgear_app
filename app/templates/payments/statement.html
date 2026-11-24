@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Statement · {{ party.name }}{% endblock %}
+{% block content %}
+{% set is_customer = kind == 'customer' %}
+<div class="d-flex gap-2 mb-3 no-print">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('balances.index', tab='collect' if is_customer else 'pay') }}">← Balances</a>
+  <button class="btn btn-sm btn-brand" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="print-page m-0">
+      <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+          <h1 class="h4 mb-1">Statement</h1>
+          <div>{{ 'Customer' if is_customer else 'Vendor' }}: <strong>{{ party.name }}</strong></div>
+          {% if party.phone %}<div class="small text-muted">{{ party.phone }}</div>{% endif %}
+          <div class="small text-muted">Date: {{ today()|d }}</div>
+        </div>
+        <img class="logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="TUR fitgear">
+      </div>
+
+      <table class="table table-sm mb-4">
+        <thead><tr>
+          <th>{{ 'Order' if is_customer else 'Order · item' }}</th><th>Due date</th>
+          <th class="num">{{ 'Billed' if is_customer else 'Cost' }}</th><th class="num">Paid</th><th class="num">Balance</th>
+        </tr></thead>
+        <tbody>
+        {% for line in lines %}
+          <tr>
+            <td>{{ line.title }}</td><td>{{ line.due_date|d }}</td>
+            <td class="num">{{ line.total|inr }}</td><td class="num">{{ line.paid|inr }}</td>
+            <td class="num fw-semibold">{{ line.balance|inr }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="text-muted">Nothing to show.</td></tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><th colspan="4">Total balance</th><th class="num">{{ balance|inr }}</th></tr></tfoot>
+      </table>
+
+      <h2 class="h6">Payments</h2>
+      <table class="table table-sm">
+        <thead><tr><th>Date</th><th>Order</th><th>Type</th><th>Mode</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        {% for t in payments %}
+          <tr>
+            <td>{{ t.date|d }}</td><td>{{ t.order.number }}</td><td>{{ t.type_label }}</td><td>{{ t.mode }}</td>
+            <td class="num">{{ '-' if is_customer and t.direction == 'out' }}{{ t.amount|inr }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="text-muted">No payments yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="small text-muted mt-4 mb-0">TUR fitgear · Thank you!</p>
+    </div>
+  </div>
+  <div class="col-lg-4 no-print">
+    <div class="card"><div class="card-body">
+      <h2 class="card-title">Text for WhatsApp</h2>
+      <textarea id="wa-text" class="form-control form-control-sm font-monospace mb-2" rows="12" readonly>{{ whatsapp_text }}</textarea>
+      <button class="btn btn-sm btn-brand" data-copy="wa-text">Copy text</button>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

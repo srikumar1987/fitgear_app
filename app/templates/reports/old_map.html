@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Check columns{% endblock %}
+{% block content %}
+{% macro amt(value) %}{{ value|inr if value is not none else '-' }}{% endmacro %}
+<h1 class="page-title mb-2">Reports</h1>
+{% include "reports/_tabs.html" %}
+
+<form method="get" action="{{ url_for('reports.old_map', token=token) }}">
+  <input type="hidden" name="name" value="{{ name }}">
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="card-title">{{ name }}: check the columns</h2>
+      <div class="row g-2 align-items-end mb-3">
+        {% if sheets|length > 1 %}
+        <div class="col-md-3">
+          <label class="form-label">Sheet</label>
+          <select name="sheet" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for s in sheets %}<option {{ 'selected' if s == sheet }}>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        {% else %}<input type="hidden" name="sheet" value="{{ sheet }}">{% endif %}
+        <div class="col-md-2">
+          <label class="form-label">Header is on row</label>
+          <input name="header" type="number" min="1" class="form-control form-control-sm" value="{{ header_row }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Year for rows without a date</label>
+          <input name="default_year" type="number" min="1990" max="2100" class="form-control form-control-sm" value="{{ default_year or '' }}" placeholder="e.g. 2024">
+        </div>
+        <div class="col-md-4 small text-muted">Row numbers ignore empty rows. Change a box and click “Update preview”.</div>
+      </div>
+
+      <div class="row g-2">
+        {% for field, label in fields %}
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">{{ label }}</label>
+          <select name="map_{{ field }}" class="form-select form-select-sm {{ 'border-success' if mapping[field] is not none }}">
+            <option value="">— not in sheet —</option>
+            {% for idx, text in columns %}<option value="{{ idx }}" {{ 'selected' if mapping[field] == idx }}>{{ text }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+        <span class="small">
+          <strong>{{ parsed|length }}</strong> rows ready to import.
+          {% if skipped.blank or skipped.total %}<span class="text-muted">Skipped {{ skipped.blank }} blank and {{ skipped.total }} total rows.</span>{% endif %}
+          {% if skipped.no_year %}<span class="text-soon">{{ skipped.no_year }} rows have no date or year. Set “Year for rows without a date”.</span>{% endif %}
+        </span>
+        <span class="d-flex gap-2">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.old_upload') }}">Choose another file</a>
+          <button class="btn btn-sm btn-outline-secondary">Update preview</button>
+          <button class="btn btn-sm btn-brand" formmethod="post" formaction="{{ url_for('reports.old_confirm', token=token) }}" {{ 'disabled' if not parsed }}>Import {{ parsed|length }} rows</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="card-title">How it will look <span class="text-muted fw-normal small">(first 15 rows)</span></h2>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead><tr><th>Row</th><th>Year</th><th>Date</th><th>ID</th><th>Order</th><th>Customer</th><th>What was ordered</th><th class="num">Billed</th><th class="num">Spent</th><th class="num">Received</th><th class="num">Profit</th></tr></thead>
+        <tbody>
+        {% for r in parsed[:15] %}
+          <tr>
+            <td class="text-muted">{{ r.row_no }}</td><td>{{ r.year }}</td><td class="text-nowrap">{{ r.order_date|d }}</td><td>{{ r.ref }}</td>
+            <td>{{ r.name }}</td><td>{{ r.customer }}</td><td class="small">{{ r['items'] }}</td>
+            <td class="num">{{ amt(r.billed) }}</td><td class="num">{{ amt(r.spent) }}</td><td class="num">{{ amt(r.received) }}</td><td class="num">{{ amt(r.profit) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="11" class="text-muted">Nothing to import yet. Check the header row and the Order name / ID columns.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="card-title">Your sheet <span class="text-muted fw-normal small">(header row and the next 8 rows, as read)</span></h2>
+    <div class="table-responsive">
+      <table class="table table-sm small">
+        <thead><tr>{% for i in range(width) %}<th>{{ column_letter(i) }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for row in raw_preview %}
+          <tr class="{{ 'fw-semibold table-warning' if loop.first }}">
+            {% for i in range(width) %}<td>{{ to_text(row[i]) if i < row|length }}</td>{% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

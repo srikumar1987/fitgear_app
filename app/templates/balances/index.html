@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Balances{% endblock %}
+{% block content %}
+{% set collect = tab == 'collect' %}
+<div class="metric-row mb-3">
+  <a class="metric big text-decoration-none text-reset" href="{{ url_for('balances.index', tab='collect') }}">
+    <div class="label">To collect from customers</div>
+    <div class="value text-paid">{{ to_collect|inr }}</div>
+  </a>
+  <a class="metric big text-decoration-none text-reset" href="{{ url_for('balances.index', tab='pay') }}">
+    <div class="label">To pay vendors</div>
+    <div class="value text-overdue">{{ to_pay|inr }}</div>
+  </a>
+  <div class="metric big">
+    <div class="label">Net position</div>
+    <div class="value">{{ (to_collect - to_pay)|inr }}</div>
+    <div class="hint">To collect minus to pay</div>
+  </div>
+</div>
+
+<nav class="tabs">
+  <a class="{{ 'active' if collect }}" href="{{ url_for('balances.index', tab='collect') }}">To collect</a>
+  <a class="{{ 'active' if not collect }}" href="{{ url_for('balances.index', tab='pay') }}">To pay</a>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+  <div class="chips">
+    <a class="chip {{ 'active' if not active }}" href="{{ url_for('balances.index', tab=tab, settled=request.args.get('settled')) }}">All</a>
+    {% for key, label, count, amount in chips %}
+      <a class="chip {{ 'active' if active == key }}" href="{{ url_for('balances.index', tab=tab, filter=key, settled=request.args.get('settled')) }}">
+        {{ label }} <span class="count">{{ count }}{% if count %} · {{ amount|inr }}{% endif %}</span>
+      </a>
+    {% endfor %}
+  </div>
+  <a class="small" href="{{ url_for('balances.index', tab=tab, filter=active or None, settled=None if show_settled else '1') }}">
+    {{ 'Hide settled' if show_settled else 'Show settled' }}
+  </a>
+</div>
+
+{% if rows %}
+<div class="table-card">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>{{ 'Customer' if collect else 'Vendor' }}</th>
+        <th class="num">{{ 'Open orders' if collect else 'Open items' }}</th>
+        <th class="num">{{ 'Billed' if collect else 'Cost' }}</th>
+        <th class="num">{{ 'Received' if collect else 'Paid' }}</th>
+        <th class="num">{{ 'Outstanding' if collect else 'Due' }}</th>
+        <th>Oldest due</th>
+        <th>Last payment</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      {% set panel = url_for('balances.customer_panel', customer_id=r.party.id) if collect else url_for('balances.vendor_panel', vendor_id=r.party.id) %}
+      <tr class="row-link" hx-get="{{ panel }}" hx-target="#panel-body" data-bs-toggle="offcanvas" data-bs-target="#panel">
+        <td class="fw-semibold">{{ r.party.name }}</td>
+        <td class="num">{{ r.open_count }}</td>
+        <td class="num">{{ r.total|inr }}</td>
+        <td class="num text-paid">{{ r.paid|inr }}</td>
+        <td class="num fw-bold {{ r.oldest_due|due_class(today) if r.balance > 0 }}">{{ r.balance|inr }}</td>
+        <td class="{{ r.oldest_due|due_class(today) if r.balance > 0 else 'text-muted' }}">{{ r.oldest_due|due_label(today) if r.balance > 0 else '-' }}</td>
+        <td class="text-muted">{{ r.last_payment|d }}</td>
+        <td class="text-end text-nowrap" onclick="event.stopPropagation()">
+          {% if collect %}
+            <a class="btn btn-sm btn-brand" href="{{ url_for('payments.receive', customer_id=r.party.id) }}">Receive</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('payments.customer_statement', customer_id=r.party.id) }}">Statement</a>
+          {% else %}
+            <a class="btn btn-sm btn-brand" href="{{ url_for('payments.pay', vendor_id=r.party.id) }}">Pay</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('payments.vendor_statement', vendor_id=r.party.id) }}">Statement</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><div class="empty">
+  {% if active %}
+    Nothing matches this filter.
+  {% elif collect %}
+    No customer owes you anything right now.
+    <div><a class="btn btn-brand btn-sm" href="{{ url_for('orders.new_order') }}">+ New order</a></div>
+  {% else %}
+    You do not owe any vendor right now.
+    <div><a class="btn btn-brand btn-sm" href="{{ url_for('orders.list_orders') }}">Go to orders</a></div>
+  {% endif %}
+</div></div>
+{% endif %}
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="panel" style="width: 460px">
+  <div class="offcanvas-header border-bottom">
+    <h5 class="offcanvas-title">Details</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body" id="panel-body"><div class="text-muted">Loading…</div></div>
+</div>
+{% endblock %}

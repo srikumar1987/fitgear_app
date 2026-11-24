@@ -1,0 +1,75 @@
+<div class="row g-3">
+  <div class="col-xl-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">Add payment</h2>
+        <form method="post" action="{{ url_for('orders.transaction_new', order_id=order.id) }}" class="row g-2">
+          <div class="col-12">
+            <label class="form-label">Type</label>
+            <select name="kind" class="form-select form-select-sm" onchange="this.form.querySelector('.alloc-field').hidden = this.value !== 'vendor'">
+              <option value="customer">Received from customer</option>
+              <option value="vendor">Paid to vendor</option>
+              <option value="expense">Expense (courier, design, etc.)</option>
+              <option value="refund">Refund to customer</option>
+            </select>
+          </div>
+          <div class="col-12 alloc-field" hidden>
+            <label class="form-label">Vendor and item</label>
+            <select name="allocation_id" class="form-select form-select-sm">
+              {% for a in allocations %}
+                <option value="{{ a.id }}">{{ a.vendor.name }} · {{ a.item.name }} (due {{ alloc_due(a)|inr }})</option>
+              {% else %}
+                <option value="">No vendor allocated yet (Vendors tab)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Amount (₹)</label>
+            <input name="amount" class="form-control form-control-sm num fw-semibold" inputmode="decimal" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Date</label>
+            <input name="date" type="date" class="form-control form-control-sm" value="{{ today().isoformat() }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Mode</label>
+            <select name="mode" class="form-select form-select-sm">{% for mode in modes %}<option>{{ mode }}</option>{% endfor %}</select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Note</label>
+            <input name="note" class="form-control form-control-sm" placeholder="optional">
+          </div>
+          <div class="col-12 text-end"><button class="btn btn-sm btn-brand">Record</button></div>
+        </form>
+        <p class="small text-muted mt-3 mb-0">One payment covering several orders? Use <a href="{{ url_for('payments.receive', customer_id=order.customer_id) }}">Receive payment</a> to split it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    <div class="table-card">
+      <table class="table">
+        <thead><tr><th>Date</th><th>Party</th><th>Type</th><th>Mode / note</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th><th></th></tr></thead>
+        <tbody>
+        {% for t, running in ledger %}
+          <tr>
+            <td class="text-nowrap">{{ t.date|d }}</td>
+            <td>{{ t.party_name }}{% if t.allocation %}<div class="small text-muted">{{ t.allocation.item.name }}</div>{% endif %}</td>
+            <td>{{ t.type_label }}</td>
+            <td class="small">{{ t.mode }}{% if t.note %} · {{ t.note }}{% endif %}{% if t.receipt_ref %}<div class="text-muted">{{ t.receipt_ref }}</div>{% endif %}</td>
+            <td class="num text-paid">{{ t.amount|inr if t.direction == 'in' }}</td>
+            <td class="num text-overdue">{{ t.amount|inr if t.direction == 'out' }}</td>
+            <td class="num text-muted">{{ running|inr }}</td>
+            <td class="text-end">
+              <form method="post" action="{{ url_for('orders.transaction_delete', transaction_id=t.id) }}" data-confirm="Delete this {{ t.type_label|lower }} of {{ t.amount|inr }} on {{ t.date|d }}?"><button class="btn btn-sm btn-link text-muted p-0" aria-label="Delete">✕</button></form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8"><div class="empty">No payments yet. Record the advance when you receive it.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="small text-muted mt-2">Net = money in minus money out for this order so far. Profit is on the Summary tab.</p>
+  </div>
+</div>

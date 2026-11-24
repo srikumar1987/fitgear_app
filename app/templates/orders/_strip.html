@@ -1,0 +1,27 @@
+<div class="metric-row" hx-get="{{ url_for('orders.strip', order_id=order.id) }}" hx-trigger="moneyChanged from:body" hx-swap="outerHTML">
+  <div class="metric">
+    <div class="label">Billed</div>
+    <div class="value">{{ m.billed|inr }}</div>
+    <div class="hint">{% if m.has_approved %}Approved quotation{% if m.charges or m.discounts %} ± adjustments{% endif %}{% else %}Draft items {{ m.items_total|inr }} · not approved{% endif %}</div>
+  </div>
+  <div class="metric">
+    <div class="label">Paid</div>
+    <div class="value text-paid">{{ m.received_net|inr }}</div>
+    <div class="hint">Received from customer</div>
+  </div>
+  <div class="metric">
+    <div class="label">Pending</div>
+    <div class="value {{ order.due_date|due_class if m.outstanding > 0 }}">{{ m.outstanding|inr }}</div>
+    <div class="hint {{ order.due_date|due_class if m.outstanding > 0 }}">{{ order.due_date|due_label if m.outstanding > 0 else ('Settled' if m.billed else '-') }}</div>
+  </div>
+  <div class="metric">
+    <div class="label">Vendor due</div>
+    <div class="value {{ 'text-overdue' if m.vendor_due > 0 }}">{{ m.vendor_due|inr }}</div>
+    <div class="hint">Cost {{ m.vendor_cost|inr }}</div>
+  </div>
+  <div class="metric">
+    <div class="label">Profit</div>
+    <div class="value">{{ m.actual_profit|inr }}</div>
+    <div class="hint">Expected {{ m.expected_profit|inr }}</div>
+  </div>
+</div>

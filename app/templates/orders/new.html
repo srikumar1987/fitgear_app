@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}New order{% endblock %}
+{% block content %}
+<h1 class="page-title mb-3">New order</h1>
+<form method="post" class="card" style="max-width: 640px">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Customer</label>
+        <select name="customer_id" class="form-select" {{ 'autofocus' if customers }}>
+          <option value="">Choose…</option>
+          {% for c in customers %}
+            <option value="{{ c.id }}" {{ 'selected' if (form.get('customer_id')|int(0) or selected) == c.id }}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">…or new customer</label>
+        <input name="new_customer" class="form-control" placeholder="Team or customer name" value="{{ form.get('new_customer', '') }}" {{ 'autofocus' if not customers }}>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Order title</label>
+        <input name="title" class="form-control" required placeholder="e.g. Vintage Warriors jerseys 2026" value="{{ form.get('title', '') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Order date</label>
+        <input name="order_date" type="date" class="form-control" value="{{ form.get('order_date') or today.isoformat() }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Delivery date (optional)</label>
+        <input name="delivery_date" type="date" class="form-control" value="{{ form.get('delivery_date', '') }}">
+      </div>
+    </div>
+  </div>
+  <div class="card-footer bg-transparent d-flex justify-content-end gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('orders.list_orders') }}">Cancel</a>
+    <button class="btn btn-brand">Create order</button>
+  </div>
+</form>
+{% endblock %}

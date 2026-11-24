@@ -1,0 +1,70 @@
+<div class="row g-3">
+{% for kind, label in file_kinds.items() %}
+  {% set files = order.files|selectattr('kind', 'equalto', kind)|list|reverse|list %}
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="card-title mb-1">{{ label }} <span class="text-muted fw-normal small">({{ files|length }})</span></h2>
+        <p class="small text-muted mb-2">
+          {% if kind == 'design' %}Mockups and artwork for the customer. Mark the version they approve.{% else %}Photos of the printed product before delivery, for your records.{% endif %}
+        </p>
+
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('designs.upload', order_id=order.id) }}" class="border rounded p-2 bg-light"
+              data-paste-upload {{ 'data-paste-default' if loop.first }}>
+          <input type="hidden" name="kind" value="{{ kind }}">
+          <div class="paste-zone" tabindex="0" data-paste-zone role="button" aria-label="Paste or drop {{ label|lower }} images here">
+            <div class="paste-hint"><strong>Click here and press Ctrl+V</strong> to paste a screenshot or copied picture, or drag files here.</div>
+            <div class="paste-preview" data-paste-preview></div>
+          </div>
+          <input type="file" name="files" multiple accept="image/*,.pdf" class="form-control form-control-sm mt-2" required aria-label="Choose files">
+          <div class="d-flex gap-2 mt-2">
+            <select name="item_id" class="form-select form-select-sm" style="max-width: 200px" aria-label="Item">
+              <option value="">Whole order</option>
+              {% for item in order.items %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}
+            </select>
+            <input name="note" class="form-control form-control-sm" placeholder="{{ 'e.g. Front v2, sent on WhatsApp' if kind == 'design' else 'e.g. Final print, 58 pcs' }}">
+            <button class="btn btn-sm btn-brand">Upload</button>
+          </div>
+          <div class="small text-muted mt-1">Images or PDF, several at once, up to 25 MB per upload.</div>
+        </form>
+
+        <div class="file-grid mt-3">
+        {% for f in files %}
+          <div class="file-card {{ 'approved' if f.approved }}">
+            <a class="thumb" href="{{ url_for('designs.serve', file_id=f.id) }}" target="_blank" title="Open full size">
+              {% if f.is_image %}
+                <img src="{{ url_for('designs.serve', file_id=f.id) }}" loading="lazy" alt="{{ f.original_name }}">
+              {% else %}
+                <span class="file-ext">PDF</span>
+              {% endif %}
+              {% if f.approved %}<span class="approved-badge">✓ Approved</span>{% endif %}
+            </a>
+            <div class="p-2">
+              <div class="small text-truncate fw-semibold" title="{{ f.original_name }}">{{ f.original_name }}</div>
+              <div class="small text-muted">{{ f.uploaded_at|d }}{% if f.item %} · {{ f.item.name }}{% endif %}</div>
+              <input class="grid-input small mt-1" name="note" value="{{ f.note }}" placeholder="Add a note" aria-label="Note"
+                     hx-post="{{ url_for('designs.update', file_id=f.id) }}" hx-trigger="change" hx-swap="none">
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                {% if kind == 'design' %}
+                  <form method="post" action="{{ url_for('designs.approve', file_id=f.id) }}">
+                    <button class="btn btn-sm py-0 {{ 'btn-approved' if f.approved else 'btn-outline-secondary' }}">{{ 'Approved' if f.approved else 'Mark approved' }}</button>
+                  </form>
+                {% else %}<span></span>{% endif %}
+                <span class="d-flex gap-2 align-items-center">
+                  <a class="small" href="{{ url_for('designs.serve', file_id=f.id, download=1) }}" title="Download">Download</a>
+                  <form method="post" action="{{ url_for('designs.delete', file_id=f.id) }}" data-confirm="Delete {{ f.original_name }}? The file will be removed.">
+                    <button class="btn btn-sm btn-link text-muted p-0" aria-label="Delete">✕</button>
+                  </form>
+                </span>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="empty small py-4">No {{ label|lower }} files yet.</div>
+        {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>

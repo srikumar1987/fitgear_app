@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Import old orders{% endblock %}
+{% block content %}
+<h1 class="page-title mb-2">Reports</h1>
+{% include "reports/_tabs.html" %}
+<div class="card" style="max-width: 720px">
+  <div class="card-body">
+    <h2 class="card-title">Import an old Excel sheet</h2>
+    <ol class="small text-muted ps-3">
+      <li>Choose your old order sheet (.xlsx or .csv).</li>
+      <li>The app finds the header row and guesses which column is the order name, date, amounts and so on.</li>
+      <li>You check the preview, fix any column, and import.</li>
+    </ol>
+    <form method="post" enctype="multipart/form-data" class="d-flex gap-2">
+      <input type="file" name="file" accept=".xlsx,.xlsm,.csv" class="form-control" required autofocus aria-label="Excel file">
+      <button class="btn btn-brand text-nowrap">Upload and preview</button>
+    </form>
+    <p class="small text-muted mt-3 mb-0">
+      Works best with one row per order and a header row such as: Order ID, Order name, Customer, Items, Date, Billed, Cost, Received, Profit.
+      Missing columns are fine; profit is worked out as billed − spent when there is no profit column.
+      Everything is read on this computer; nothing is uploaded to the internet.
+    </p>
+  </div>
+</div>
+{% endblock %}

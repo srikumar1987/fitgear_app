@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Directory{% endblock %}
+{% block content %}
+{% set vendors_tab = tab == 'vendors' %}
+<div class="d-flex justify-content-between align-items-center mb-1">
+  <h1 class="page-title">Directory</h1>
+  <form class="d-flex gap-2" method="get">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <input name="q" type="search" class="form-control form-control-sm" placeholder="Search {{ tab }}" value="{{ q }}">
+  </form>
+</div>
+<nav class="tabs">
+  <a class="{{ 'active' if not vendors_tab }}" href="{{ url_for('directory.index', tab='customers') }}">Customers</a>
+  <a class="{{ 'active' if vendors_tab }}" href="{{ url_for('directory.index', tab='vendors') }}">Vendors</a>
+</nav>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('directory.vendor_new' if vendors_tab else 'directory.customer_new') }}" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">{{ 'Vendor' if vendors_tab else 'Customer / team' }} name</label>
+        <input name="name" class="form-control form-control-sm" required {{ 'autofocus' if not parties }}>
+      </div>
+      <div class="col-md-2"><label class="form-label">Phone</label><input name="phone" class="form-control form-control-sm"></div>
+      {% if vendors_tab %}
+        <div class="col-md-2"><label class="form-label">Credit days</label><input name="credit_days" type="number" min="0" value="0" class="form-control form-control-sm"></div>
+      {% else %}
+        <div class="col-md-2"><label class="form-label">Email</label><input name="email" type="email" class="form-control form-control-sm"></div>
+      {% endif %}
+      <div class="col-md-3"><label class="form-label">Notes</label><input name="notes" class="form-control form-control-sm"></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-brand w-100">+ Add {{ 'vendor' if vendors_tab else 'customer' }}</button></div>
+    </form>
+  </div>
+</div>
+
+{% if parties %}
+<div class="table-card">
+  <table class="table size-table">
+    <thead><tr>
+      <th>Name</th><th>Phone</th><th>{{ 'Credit days' if vendors_tab else 'Email' }}</th><th>Notes</th>
+      <th class="num">{{ 'You owe' if vendors_tab else 'Owes you' }}</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for p in parties %}
+      {% set url = url_for('directory.vendor_update' if vendors_tab else 'directory.customer_update', **({'vendor_id': p.id} if vendors_tab else {'customer_id': p.id})) %}
+      {% set b = balances.get(p.id) %}
+      <tr>
+        <td><input class="grid-input fw-semibold" name="name" value="{{ p.name }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Name"></td>
+        <td><input class="grid-input" name="phone" value="{{ p.phone }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Phone"></td>
+        <td>
+          {% if vendors_tab %}
+            <input class="grid-input" style="max-width: 90px" type="number" min="0" name="credit_days" value="{{ p.credit_days }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Credit days">
+          {% else %}
+            <input class="grid-input" type="email" name="email" value="{{ p.email }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Email">
+          {% endif %}
+        </td>
+        <td><input class="grid-input" name="notes" value="{{ p.notes }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Notes"></td>
+        <td class="num fw-semibold {{ 'text-overdue' if b and b.balance > 0 and vendors_tab }}">{{ b.balance|inr if b else '-' }}</td>
+        <td class="text-end text-nowrap">
+          {% if vendors_tab %}
+            <a class="btn btn-sm btn-link" href="{{ url_for('payments.vendor_statement', vendor_id=p.id) }}">Statement</a>
+            {% if not p.allocations and not p.transactions %}
+            <form class="d-inline" method="post" action="{{ url_for('directory.vendor_delete', vendor_id=p.id) }}" data-confirm="Delete vendor {{ p.name }}?"><button class="btn btn-sm btn-link text-muted">Delete</button></form>
+            {% endif %}
+          {% else %}
+            <a class="btn btn-sm btn-link" href="{{ url_for('orders.new_order', customer_id=p.id) }}">+ Order</a>
+            <a class="btn btn-sm btn-link" href="{{ url_for('payments.customer_statement', customer_id=p.id) }}">Statement</a>
+            {% if not p.orders and not p.transactions %}
+            <form class="d-inline" method="post" action="{{ url_for('directory.customer_delete', customer_id=p.id) }}" data-confirm="Delete customer {{ p.name }}?"><button class="btn btn-sm btn-link text-muted">Delete</button></form>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><div class="empty">{% if q %}Nothing matches “{{ q }}”.{% else %}No {{ tab }} yet. Add the first one above.{% endif %}</div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+{% macro pct(value) %}{{ '%.1f'|format(value) ~ '%' if value is not none else '-' }}{% endmacro %}
+<h1 class="page-title mb-2">Reports</h1>
+{% include "reports/_tabs.html" %}
+<div class="d-flex justify-content-end align-items-center gap-2 flex-wrap mb-3">
+  <div class="d-flex gap-2">
+    <form method="get" class="d-flex gap-2">
+      {% if year %}<input type="hidden" name="year" value="{{ year }}">{% endif %}
+      <input name="q" type="search" class="form-control form-control-sm" placeholder="Filter by order or customer" value="{{ q }}">
+    </form>
+    <a class="btn btn-sm btn-outline-secondary text-nowrap" href="{{ url_for('reports.export', year=year, q=q or None) }}">Download Excel</a>
+  </div>
+</div>
+
+<div class="chips mb-3">
+  <a class="chip {{ 'active' if not year }}" href="{{ url_for('reports.index', q=q or None) }}">All years</a>
+  {% for y in years %}<a class="chip {{ 'active' if year == y }}" href="{{ url_for('reports.index', year=y, q=q or None) }}">{{ y }}</a>{% endfor %}
+</div>
+
+<div class="metric-row mb-3">
+  <div class="metric"><div class="label">Orders</div><div class="value">{{ overall.rows|length }}</div></div>
+  <div class="metric"><div class="label">Billed</div><div class="value">{{ overall.billed|inr }}</div></div>
+  <div class="metric"><div class="label">Spent</div><div class="value">{{ overall.spent|inr }}</div><div class="hint">Vendor cost + expenses</div></div>
+  <div class="metric"><div class="label">Received</div><div class="value text-paid">{{ overall.received|inr }}</div></div>
+  <div class="metric"><div class="label">Profit</div><div class="value {{ 'text-overdue' if overall.profit < 0 }}">{{ overall.profit|inr }}</div><div class="hint">{{ pct(overall.margin) }} of billed</div></div>
+</div>
+
+{% for g in groups %}
+<details class="year-group mb-3" open>
+  <summary>
+    <span class="year">{{ g.year }}</span>
+    <span class="text-muted">{{ g.rows|length }} order{{ 's' if g.rows|length != 1 }}</span>
+    <span class="ms-auto small">Received <strong class="text-paid">{{ g.received|inr }}</strong> · Profit <strong>{{ g.profit|inr }}</strong> ({{ pct(g.margin) }})</span>
+  </summary>
+  <div class="table-card">
+    <table class="table table-hover">
+      <thead><tr>
+        <th class="num" style="width: 50px">S.No</th><th>ID</th><th>Order</th><th>What was ordered</th><th>Order date</th>
+        <th class="num">Billed</th><th class="num">Spent</th><th class="num">Received</th><th class="num">Profit</th><th class="num">Profit %</th>
+      </tr></thead>
+      <tbody>
+      {% for r in g.rows %}
+        <tr class="row-link" onclick="location.href='{{ url_for('orders.detail', order_id=r.order.id, tab='summary') }}'">
+          <td class="num text-muted">{{ r.serial }}</td>
+          <td class="text-nowrap fw-semibold">{{ r.order.number }}</td>
+          <td>{{ r.order.title }}<div class="small text-muted">{{ r.order.customer.name }} · <span class="status {{ r.order.status|status_class }}">{{ r.order.status }}</span></div></td>
+          <td class="small">{{ r.items }}</td>
+          <td class="text-nowrap">{{ r.order.order_date|d }}</td>
+          <td class="num">{{ r.m.billed|inr }}</td>
+          <td class="num">{{ r.spent|inr }}{% if r.m.vendor_paid != r.m.vendor_cost %}<div class="small text-muted">paid {{ (r.m.vendor_paid + r.m.expenses)|inr }}</div>{% endif %}</td>
+          <td class="num text-paid">{{ r.m.received_net|inr }}</td>
+          <td class="num fw-semibold {{ 'text-overdue' if r.profit < 0 }}">{{ r.profit|inr }}</td>
+          <td class="num {{ 'text-overdue' if r.margin is not none and r.margin < 0 }}">{{ pct(r.margin) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr class="fw-bold">
+        <td colspan="5">Total {{ g.year }}</td>
+        <td class="num">{{ g.billed|inr }}</td><td class="num">{{ g.spent|inr }}</td>
+        <td class="num text-paid">{{ g.received|inr }}</td><td class="num">{{ g.profit|inr }}</td><td class="num">{{ pct(g.margin) }}</td>
+      </tr></tfoot>
+    </table>
+  </div>
+</details>
+{% else %}
+<div class="card"><div class="empty">No orders{% if q %} match “{{ q }}”{% endif %}.</div></div>
+{% endfor %}
+
+<p class="small text-muted">Spent = vendor cost (actual, or agreed until the actual bill is entered) + expenses. Profit = billed − spent. Profit % = profit ÷ billed. Orders are grouped by order date.</p>
+{% endblock %}

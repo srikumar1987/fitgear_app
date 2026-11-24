@@ -1,0 +1,7 @@
+# Works on Python 3.8+. pip picks versions that match the installed Python
+# (on 3.8: Flask 3.0.x, Werkzeug 3.0.x, SQLAlchemy 2.0.x, waitress 3.0.0). Verified with 3.8.10 and 3.14.
+Flask>=3.0,<4
+Flask-SQLAlchemy>=3.1,<4
+SQLAlchemy>=2.0.36,<3
+openpyxl>=3.1,<4
+waitress>=3.0,<4

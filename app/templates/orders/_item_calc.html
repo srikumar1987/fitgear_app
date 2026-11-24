@@ -1,0 +1,4 @@
+<div hx-get="{{ url_for('orders.item_calc', item_id=item.id) }}" hx-trigger="moneyChanged from:body" hx-swap="outerHTML">
+  <div class="small text-muted">{{ item.qty }} pcs</div>
+  <div class="fw-bold fs-6 num">{{ item.line_total|inr }}</div>
+</div>

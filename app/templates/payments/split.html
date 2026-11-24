@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Receive payment' if kind == 'receive' else 'Pay vendor' }}{% endblock %}
+{% block content %}
+{% set receiving = kind == 'receive' %}
+{% set party_field = 'customer_id' if receiving else 'vendor_id' %}
+<h1 class="page-title mb-3">{{ 'Receive payment' if receiving else 'Pay vendor' }}</h1>
+
+<div class="card mb-3" style="max-width: 900px">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">{{ 'Customer' if receiving else 'Vendor' }}</label>
+        <select name="{{ party_field }}" class="form-select" onchange="this.form.submit()" {{ 'autofocus' if not party }}>
+          <option value="">Choose…</option>
+          {% for p in parties %}<option value="{{ p.id }}" {{ 'selected' if party and p.id == party.id }}>{{ p.name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% if not parties %}
+        <div class="col-md-6 small text-muted">
+          No {{ 'customers' if receiving else 'vendors' }} yet. <a href="{{ url_for('directory.index', tab='customers' if receiving else 'vendors') }}">Add one in the Directory</a>.
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if party %}
+  {% if rows %}
+  <form method="post" data-split class="card" style="max-width: 900px">
+    <input type="hidden" name="{{ party_field }}" value="{{ party.id }}">
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        <div class="col-md-3">
+          <label class="form-label">Amount {{ 'received' if receiving else 'paid' }}</label>
+          <input name="amount" class="form-control num fw-bold" inputmode="decimal" required autofocus value="{{ form.get('amount', '') }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Date</label>
+          <input name="date" type="date" class="form-control" value="{{ form.get('date') or today.isoformat() }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Mode</label>
+          <select name="mode" class="form-select">
+            {% for mode in modes %}<option {{ 'selected' if form.get('mode') == mode }}>{{ mode }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Note (optional)</label>
+          <input name="note" class="form-control" value="{{ form.get('note', '') }}" placeholder="UPI ref, cheque no…">
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="small text-muted">Split across {{ 'orders' if receiving else 'items' }} (oldest due first). Edit if needed.</span>
+        <button type="button" class="btn btn-sm btn-link" data-auto-split>Auto-split again</button>
+      </div>
+      <table class="table table-sm">
+        <thead><tr>
+          <th>{{ 'Order' if receiving else 'Order · item' }}</th><th>Due</th>
+          <th class="num">{{ 'Outstanding' if receiving else 'Due' }}</th><th class="num" style="width: 160px">This payment</th>
+        </tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td><a href="{{ r.url }}" target="_blank">{{ r.title }}</a><div class="small text-muted">{{ r.sub }}</div></td>
+            <td class="small {{ r.due_date|due_class if r.balance > 0 }}">{{ r.due_date|due_label if r.balance > 0 else '-' }}</td>
+            <td class="num">{{ r.balance|inr }}</td>
+            <td><input name="{{ r.key }}" data-balance="{{ r.balance }}" class="form-control form-control-sm num" inputmode="decimal" value="{{ form.get(r.key, '') }}"></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <span data-unallocated class="small"></span>
+        <button type="submit" class="btn btn-brand">{{ 'Record payment' if receiving else 'Record vendor payment' }}</button>
+      </div>
+    </div>
+  </form>
+  {% else %}
+  <div class="card" style="max-width: 900px"><div class="empty">
+    {% if receiving %}
+      {{ party.name }} has no open orders.
+      <div><a class="btn btn-brand btn-sm" href="{{ url_for('orders.new_order', customer_id=party.id) }}">+ New order for {{ party.name }}</a></div>
+    {% else %}
+      {{ party.name }} has nothing allocated. Allocate items to this vendor from an order's Vendors tab.
+    {% endif %}
+  </div></div>
+  {% endif %}
+{% endif %}
+{% endblock %}

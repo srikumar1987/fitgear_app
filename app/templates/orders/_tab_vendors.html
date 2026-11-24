@@ -1,0 +1,123 @@
+{% if not order.items %}
+  <div class="card"><div class="empty">Add items first, then choose which vendor makes each one.
+    <div><a class="btn btn-brand btn-sm" href="{{ url_for('orders.detail', order_id=order.id, tab='items') }}">Go to Items & Sizes</a></div>
+  </div></div>
+{% elif not vendors %}
+  <div class="card"><div class="empty">No vendors yet.
+    <div><a class="btn btn-brand btn-sm" href="{{ url_for('directory.index', tab='vendors') }}">Add a vendor</a></div>
+  </div></div>
+{% else %}
+<datalist id="option-names">{% for name in option_names %}<option value="{{ name }}">{% endfor %}</datalist>
+{% for item in order.items %}
+<div class="card mb-3" id="item-{{ item.id }}">
+  <div class="card-body">
+    <h2 class="card-title mb-2">{{ item.name }} <span class="text-muted fw-normal small">· {{ item.qty }} pcs · billed {{ item.line_total|inr }}</span></h2>
+
+    {% for a in item.allocations %}
+    {% set url = url_for('orders.allocation_update', allocation_id=a.id) %}
+    <div class="alloc border rounded p-2 mb-2">
+      <table class="table table-sm size-table mb-1">
+        <thead><tr>
+          <th>Vendor</th><th class="num" style="width: 130px">Agreed cost</th><th class="num" style="width: 120px">Actual cost</th>
+          <th style="width: 130px">Status</th><th style="width: 140px">Received on</th><th style="width: 140px">Pay by</th>
+          <th class="num">Paid / due</th><th style="width: 30px"></th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>
+              <select class="grid-input fw-semibold" name="vendor_id" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Vendor">
+                {% for v in vendors %}<option value="{{ v.id }}" {{ 'selected' if v.id == a.vendor_id }}>{{ v.name }}</option>{% endfor %}
+              </select>
+            </td>
+            <td class="num">
+              {% if a.lines %}
+                <span id="agreed-{{ a.id }}" class="fw-semibold">{{ a.agreed_total|inr }}</span>
+                <div class="small text-muted">from {{ a.lines|length }} option{{ 's' if a.lines|length != 1 }}</div>
+              {% else %}
+                <input class="grid-input text-end" name="agreed_cost" inputmode="decimal" value="{{ a.agreed_cost|plain }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Agreed cost">
+              {% endif %}
+            </td>
+            <td class="num"><input class="grid-input text-end" name="actual_cost" inputmode="decimal" value="{{ a.actual_cost|plain }}" placeholder="same" title="Fill only if the final bill differs from the agreed cost" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Actual cost"></td>
+            <td>
+              <select class="grid-input" name="status" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Status">
+                {% for s in alloc_statuses %}<option {{ 'selected' if s == a.status }}>{{ s }}</option>{% endfor %}
+              </select>
+            </td>
+            <td><input class="grid-input" id="recv-{{ a.id }}" type="date" name="received_date" value="{{ a.received_date|iso }}" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Received on"></td>
+            <td><input class="grid-input" type="date" name="due_date" value="{{ a.due_date|iso }}" title="Blank = received date + vendor credit days" hx-post="{{ url }}" hx-trigger="change" hx-swap="none" aria-label="Pay by"></td>
+            {% set paid = alloc_paid(a) %}{% set due = alloc_due(a) %}
+            {% include "orders/_alloc_calc.html" %}
+            <td class="text-end">
+              <form method="post" action="{{ url_for('orders.allocation_delete', allocation_id=a.id) }}" data-confirm="Remove {{ a.vendor.name }} from {{ item.name }}?"><button class="btn btn-sm btn-link text-muted p-0" aria-label="Remove">✕</button></form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {% if a.lines %}
+      <table class="table table-sm size-table mb-1 ms-3" style="max-width: 640px">
+        <thead><tr><th>Option</th><th class="num" style="width: 90px">Qty</th><th class="num" style="width: 120px">Rate / pc</th><th class="num" style="width: 120px">Amount</th><th style="width: 30px"></th></tr></thead>
+        <tbody>
+        {% for line in a.lines %}
+          {% set lurl = url_for('orders.allocation_line_update', line_id=line.id) %}
+          <tr>
+            <td><input class="grid-input" name="label" list="option-names" value="{{ line.label }}" hx-post="{{ lurl }}" hx-trigger="change" hx-swap="none" aria-label="Option"></td>
+            <td class="num"><input class="grid-input text-end" type="number" min="0" name="qty" value="{{ line.qty }}" hx-post="{{ lurl }}" hx-trigger="change" hx-swap="none" aria-label="Quantity"></td>
+            <td class="num"><input class="grid-input text-end" name="rate" inputmode="decimal" value="{{ line.rate|plain }}" hx-post="{{ lurl }}" hx-trigger="change" hx-swap="none" aria-label="Rate per piece"></td>
+            <td class="num" id="line-amt-{{ line.id }}">{{ line.amount|inr }}</td>
+            <td class="text-end">
+              <form method="post" action="{{ url_for('orders.allocation_line_delete', line_id=line.id) }}" data-confirm="Remove option {{ line.label }}?"><button class="btn btn-sm btn-link text-muted p-0" aria-label="Remove option">✕</button></form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr>
+          <td class="small text-muted">Total pieces</td>
+          <td class="num small {{ 'text-soon' if a.lines_qty != item.qty }}" title="Item has {{ item.qty }} pcs"><span id="lines-qty-{{ a.id }}">{{ a.lines_qty }}</span> / {{ item.qty }}</td>
+          <td colspan="3"></td>
+        </tr></tfoot>
+      </table>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('orders.allocation_line_new', allocation_id=a.id) }}" class="d-flex gap-1 align-items-center ms-3 {{ 'collapse' if not a.lines }}" id="add-line-{{ a.id }}" style="max-width: 640px">
+        <input name="label" list="option-names" class="form-control form-control-sm" placeholder="Option, e.g. Full sleeve" required>
+        <input name="qty" type="number" min="0" class="form-control form-control-sm num" style="max-width: 90px" placeholder="Qty">
+        <input name="rate" inputmode="decimal" class="form-control form-control-sm num" style="max-width: 120px" placeholder="Rate / pc">
+        <button class="btn btn-sm btn-outline-secondary text-nowrap">+ Add option</button>
+      </form>
+      {% if not a.lines %}
+        <button type="button" class="btn btn-sm btn-link ms-2 p-0" data-bs-toggle="collapse" data-bs-target="#add-line-{{ a.id }}">Price by option instead (half sleeve, full sleeve, track pant…)</button>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <form method="post" action="{{ url_for('orders.allocation_new', item_id=item.id) }}" class="mt-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">{{ 'Add another vendor' if item.allocations else 'Who is making it?' }}</label>
+          <select name="vendor_id" class="form-select form-select-sm" required>
+            <option value="">Choose vendor…</option>
+            {% for v in vendors %}<option value="{{ v.id }}">{{ v.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Agreed cost, one total (₹)</label>
+          <input name="agreed_cost" class="form-control form-control-sm num" inputmode="decimal" placeholder="or price by option below">
+        </div>
+        <div class="col-md-2"><button class="btn btn-sm btn-brand w-100">Allocate</button></div>
+      </div>
+      <div class="mt-2">
+        <span class="form-label">Or price by option (any name, e.g. half sleeve, full sleeve, sleeveless, track pant):</span>
+        <div class="line-input d-flex gap-1 mt-1" style="max-width: 560px">
+          <input name="line_label" list="option-names" class="form-control form-control-sm" placeholder="Option">
+          <input name="line_qty" type="number" min="0" class="form-control form-control-sm num" style="max-width: 90px" placeholder="Qty">
+          <input name="line_rate" inputmode="decimal" class="form-control form-control-sm num" style="max-width: 120px" placeholder="Rate / pc">
+        </div>
+        <button type="button" class="btn btn-sm btn-link px-0" data-add-line>+ Another option</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+<p class="small text-muted">Click any box to edit it; it saves when you leave the box. Agreed cost = one total, or the sum of options (qty × rate). Actual cost: fill only if the final vendor bill is different. Pay-by date: if blank, it is the received date plus the vendor's credit days (Directory → Vendors).</p>
+{% endif %}

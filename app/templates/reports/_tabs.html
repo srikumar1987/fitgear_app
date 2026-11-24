@@ -1,0 +1,4 @@
+<nav class="tabs mt-0">
+  <a class="{{ 'active' if request.endpoint in ('reports.index',) }}" href="{{ url_for('reports.index') }}">Orders report</a>
+  <a class="{{ 'active' if request.endpoint and request.endpoint.startswith('reports.old') }}" href="{{ url_for('reports.old') }}">Old reports</a>
+</nav>
