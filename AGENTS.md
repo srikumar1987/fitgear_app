@@ -20,8 +20,8 @@ Internal order, size-sheet and payments app for one administrator. The plan is i
 - Design / after-print uploads: `./uploads` (override with `TUR_UPLOAD_DIR`). It sits inside the OneDrive folder, so files are synced off the machine. Images and PDF only, 25 MB per request; stored as `<order>_<uuid>.<ext>`, served only to a logged-in user via `/files/<id>`.
 
 ## Commands
-- Run (end user): double-click `start.bat`. Opens http://localhost:5000.
-- Run (dev): `"%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" run.py`. Env: `TUR_PORT`, `TUR_HOST=0.0.0.0` for phone access on Wi-Fi, `TUR_NO_BROWSER=1`.
+- Run (end user): double-click `start.bat`. It runs from a temp copy of itself, stops the running app (`fitgear_start.py --stop`: token-protected `/_control/stop`, which backs up first; fallback `taskkill` only for a Python process on the port), runs `git pull --ff-only origin main` if possible, installs requirements, and starts `pythonw fitgear_start.py`. Opens http://localhost:5000. `stop.bat` stops the app. Keep .bat files CRLF.
+- Run (dev): `"%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" fitgear_start.py`. Env: `TUR_PORT`, `TUR_HOST=0.0.0.0` for phone access on Wi-Fi, `TUR_NO_BROWSER=1`.
 - Install dev deps: `"%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" -m pip install -r requirements-dev.txt`
 - Tests: `"%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" -m pytest -q -p no:cacheprovider -W error::sqlalchemy.exc.SAWarning` (no cache: OneDrive locks `.pytest_cache`)
 

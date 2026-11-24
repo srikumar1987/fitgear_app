@@ -1,7 +1,8 @@
 """Start TUR fitgear with the Waitress server and open it in the browser.
 
-`run.py --check` (run by start.bat first) reuses a running copy of the same version, or stops an
-outdated one after an update so the new code is used.
+`fitgear_start.py --stop` (run by start.bat before updating, and by stop.bat) stops the running copy:
+politely through a local token-protected endpoint (it saves a backup), or, for very old copies, by
+ending the Python process listening on the port.
 
 start.bat runs this with pythonw (no console window), so a stray Ctrl+C or a click in a
 console cannot stop or freeze the app. Output goes to tur_fitgear.log in the data folder.
@@ -13,14 +14,12 @@ import logging
 import os
 import socket
 import sys
+import subprocess
 import threading
 import time
 import urllib.error
 import urllib.request
 import webbrowser
-
-# Exit codes of `run.py --check` (used by start.bat)
-START_NEW, ALREADY_LATEST, OLD_VERSION_RUNNING = 0, 10, 11
 
 
 def already_running(port: int) -> bool:
@@ -43,28 +42,50 @@ def _local(method: str, url: str, headers: dict | None = None) -> tuple[int, str
         return 0, ""
 
 
-def check(port: int) -> int:
-    """Before starting: reuse a running copy of the same version, or stop an outdated one."""
-    if not already_running(port):
-        return START_NEW
-    from app import CONTROL_TOKEN_FILE, build_id, data_dir
-
-    base = f"http://127.0.0.1:{port}"
-    status, running_build = _local("GET", f"{base}/_control/build")
-    if status == 200 and running_build.strip() == build_id():
-        if os.environ.get("TUR_NO_BROWSER") != "1":
-            webbrowser.open(f"http://localhost:{port}")
-        return ALREADY_LATEST
-    token_file = data_dir() / CONTROL_TOKEN_FILE
-    if status != 200 or not token_file.exists():
-        return OLD_VERSION_RUNNING
-    print("An older version of TUR fitgear is running. Saving a backup and restarting it...")
-    _local("POST", f"{base}/_control/stop", {"X-Control-Token": token_file.read_text().strip()})
-    for _ in range(40):
+def _wait_until_stopped(port: int, seconds: int = 20) -> bool:
+    for _ in range(seconds * 2):
         if not already_running(port):
-            return START_NEW
+            return True
         time.sleep(0.5)
-    return OLD_VERSION_RUNNING
+    return False
+
+
+def _python_pid_on_port(port: int) -> int | None:
+    """PID listening on the port, only if it is a Python process (never touches other programs)."""
+    try:
+        netstat = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=20).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in netstat.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[3] == "LISTENING" and parts[1].endswith(f":{port}") and parts[4].isdigit():
+            pid = int(parts[4])
+            image = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                                   capture_output=True, text=True, timeout=20).stdout.lower()
+            return pid if ('"python.exe"' in image or '"pythonw.exe"' in image) else None
+    return None
+
+
+def stop(port: int) -> int:
+    """Stop the running copy. Politely first (it saves a backup); very old copies are ended directly."""
+    if not already_running(port):
+        return 0
+    from app import CONTROL_TOKEN_FILE, data_dir
+
+    print("Stopping the running TUR fitgear (a backup is saved first)...")
+    token_file = data_dir() / CONTROL_TOKEN_FILE
+    if token_file.exists():
+        status, _ = _local("POST", f"http://127.0.0.1:{port}/_control/stop",
+                           {"X-Control-Token": token_file.read_text().strip()})
+        if status == 200 and _wait_until_stopped(port):
+            return 0
+    pid = _python_pid_on_port(port)
+    if pid:
+        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=20)
+        if _wait_until_stopped(port):
+            return 0
+    print(f"Port {port} is used by another program, or TUR fitgear could not be stopped.")
+    return 1
 
 
 def main() -> None:
@@ -104,8 +125,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    if "--check" in sys.argv:
-        sys.exit(check(int(os.environ.get("TUR_PORT", "5000"))))
+    if "--stop" in sys.argv:
+        sys.exit(stop(int(os.environ.get("TUR_PORT", "5000"))))
     try:
         main()
     except Exception:

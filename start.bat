@@ -1,12 +1,37 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+rem Run from a temporary copy, so "git pull" can safely replace this file while it runs.
+if /i not "%~1"=="--from-temp" (
+  copy /y "%~f0" "%TEMP%\tur_fitgear_start.bat" >nul
+  "%TEMP%\tur_fitgear_start.bat" --from-temp "%~dp0."
+)
+cd /d "%~2"
 title TUR fitgear
 
 rem The virtual environment lives outside OneDrive so it is not synced.
 set "VENV=%LOCALAPPDATA%\TURfitgear\venv"
 if not defined TUR_PORT set "TUR_PORT=5000"
 
+rem 1. Stop the running app (it saves a backup first).
+if exist "%VENV%\Scripts\python.exe" (
+  "%VENV%\Scripts\python.exe" fitgear_start.py --stop
+  if errorlevel 1 (
+    echo.
+    echo Could not stop the running app. Close it from Settings, "Stop the app", and run start.bat again.
+    pause
+    goto :eof
+  )
+)
+
+rem 2. Get the latest version from GitHub (skipped if offline, not a git copy, or git is not installed).
+where git >nul 2>nul
+if not errorlevel 1 if exist ".git" (
+  echo Checking for updates...
+  git pull --ff-only origin main
+  if errorlevel 1 echo Could not update now (offline, or local changes^). Starting the current version.
+)
+
+rem 3. Python environment and packages.
 if not exist "%VENV%\Scripts\python.exe" (
   echo First run: setting up TUR fitgear. This takes a minute...
   rem Use "python" if it is on PATH, otherwise the "py" launcher.
@@ -16,28 +41,11 @@ if not exist "%VENV%\Scripts\python.exe" (
   rem Python 3.8 ships an old pip; upgrade it (pip picks the newest version that supports this Python).
   "%VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q --upgrade pip || goto :error
 )
-
 echo Checking packages...
 "%VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r requirements.txt || goto :error
 
-rem Already running? Reuse it if it is this version; restart it if it is older (after an update).
-"%VENV%\Scripts\python.exe" run.py --check
-if errorlevel 11 (
-  echo.
-  echo An older version of TUR fitgear is still running.
-  echo In the app, open Settings and click "Stop the app", then run start.bat again.
-  pause
-  goto :eof
-)
-if errorlevel 10 (
-  echo.
-  echo TUR fitgear is already running at http://localhost:%TUR_PORT% and has opened in your browser.
-  ping -n 4 127.0.0.1 >nul
-  goto :eof
-)
-
-rem Run the app in the background (no console), so Ctrl+C or clicking a window cannot stop or freeze it.
-start "" "%VENV%\Scripts\pythonw.exe" run.py
+rem 4. Start the app in the background (no console), so Ctrl+C or clicking a window cannot stop or freeze it.
+start "" "%VENV%\Scripts\pythonw.exe" fitgear_start.py
 
 rem Wait up to 15 seconds for the app to answer.
 "%VENV%\Scripts\python.exe" -c "import socket,sys,time;p=int(sys.argv[1]);ok=any(socket.socket().connect_ex(('127.0.0.1',p))==0 or time.sleep(0.5) for _ in range(30));sys.exit(0 if ok else 1)" %TUR_PORT%
@@ -49,7 +57,7 @@ if errorlevel 1 (
 )
 echo.
 echo TUR fitgear is running at http://localhost:%TUR_PORT% and has opened in your browser.
-echo This window will close by itself. To stop the app: Settings, then "Stop the app".
+echo This window will close by itself. To stop the app: Settings, "Stop the app", or double-click stop.bat.
 ping -n 5 127.0.0.1 >nul
 goto :eof
 

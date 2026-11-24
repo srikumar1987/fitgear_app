@@ -51,15 +51,18 @@ Money rules (always calculated, never typed in):
    - The app starts **in the background** and opens `http://localhost:5000` in your browser.
 3. On first open, set the admin password.
 
-To stop the app, go to **Settings → Stop the app** (a backup is saved first). Running `start.bat` again starts it, or just opens the browser if it is already running.
+Each time you run **`start.bat`** it:
+
+1. stops the running app (a backup is saved first);
+2. updates the code with `git pull --ff-only origin main` (skipped if offline, if the folder is a ZIP download rather than a git clone, or if git isn't installed);
+3. installs any new packages;
+4. starts the app in the background and opens the browser.
+
+To stop the app: **Settings → Stop the app**, or double-click **`stop.bat`**.
 
 ### Updating
 
-```bat
-git pull
-```
-
-Then stop the app and run `start.bat` again. Your data is not stored in this folder, so updating never touches it.
+Just run `start.bat`; it pulls the latest version itself. Your data is not stored in this folder, so updating never touches it. With a ZIP download, download the new ZIP, replace the files, and run `start.bat`.
 
 ---
 
@@ -110,8 +113,9 @@ app/
   templates/       pages and partials
   static/          css, js, images, vendor (Bootstrap, HTMX)
 tests/             pytest suite
-run.py             starts the Waitress server
-start.bat          one-click start for Windows
+fitgear_start.py   starts the Waitress server (--stop stops the running copy)
+start.bat          one click: stop, git pull, install packages, start
+stop.bat           stops the app
 ```
 
 ## Development
@@ -119,10 +123,10 @@ start.bat          one-click start for Windows
 ```bat
 "%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" -m pip install -r requirements-dev.txt
 "%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" -m pytest -q -p no:cacheprovider
-"%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" run.py
+"%LOCALAPPDATA%\TURfitgear\venv\Scripts\python.exe" fitgear_start.py
 ```
 
-Running `run.py` with `python.exe` shows output in the console; `start.bat` uses `pythonw.exe` (no window) and logs to `tur_fitgear.log` in the data folder. Keep the code compatible with Python 3.8. See [`AGENTS.md`](AGENTS.md) for conventions, and [`TUR_fitgear_Plan.md`](TUR_fitgear_Plan.md) for the product plan and roadmap.
+Running `fitgear_start.py` with `python.exe` shows output in the console; `start.bat` uses `pythonw.exe` (no window) and logs to `tur_fitgear.log` in the data folder. Keep the code compatible with Python 3.8. See [`AGENTS.md`](AGENTS.md) for conventions, and [`TUR_fitgear_Plan.md`](TUR_fitgear_Plan.md) for the product plan and roadmap.
 
 ## Security notes
 
