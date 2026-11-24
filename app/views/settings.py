@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import threading
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, session, url_for
+from flask import (
+    Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, session, url_for,
+)
 from sqlalchemy import select
 from werkzeug.security import check_password_hash
 
 from .. import db, gdrive
-from ..backup import backup_dir, check_backup_dir, custom_backup_dir, list_backups, make_backup
+from ..backup import backup_dir, check_backup_dir, custom_backup_dir, is_new_backup, list_backups, make_backup
 from ..export import build_workbook
-from ..models import Admin, audit, set_setting
+from ..models import Admin, Customer, Order, audit, set_setting
+from ..restore import RestoreError, restore_database
 from ..sizes import get_scale, normalise_size
 from .auth import MIN_PASSWORD, hash_password
 
@@ -105,7 +109,10 @@ def backup_now():
     except Exception as exc:  # shown to the single admin so they can fix the folder
         flash(f"Backup failed: {exc}", "danger")
     else:
-        flash(f"Backup saved: {path.name}", "success")
+        if is_new_backup(current_app):
+            flash(f"Backup saved: {path.name}", "success")
+        else:
+            flash(f"No changes since the last backup ({path.name}), so no new copy was needed.", "success")
     return redirect(url_for("settings.index"))
 
 
@@ -175,12 +182,82 @@ def gdrive_callback():
             audit("setting", None, "gdrive_connect", email)
             db.session.commit()
             try:
+                if not _local_has_data() and gdrive.list_drive_backups(_data_dir()):
+                    flash(f"Connected to Google Drive as {email}. Backups from another PC were found. "
+                          "Restore the latest one below to bring your data here.", "success")
+                    return redirect(url_for("settings.restore_page"))
                 result = gdrive.sync(_data_dir(), make_backup(current_app, cloud=False),
                                      Path(current_app.config["UPLOAD_DIR"]))
                 flash(f"Connected to Google Drive as {email}. Uploaded: {result}.", "success")
             except gdrive.DriveError as exc:
                 flash(f"Connected as {email}, but the first upload failed: {exc}", "danger")
     return redirect(url_for("settings.index", _anchor="gdrive"))
+
+
+def _local_has_data() -> bool:
+    return db.session.query(Customer.id).first() is not None or db.session.query(Order.id).first() is not None
+
+
+def _restored_message(counts: dict, source: str) -> str:
+    return (f"Restored from {source}: {counts['customers']} customers, {counts['orders']} orders, "
+            f"{counts['payments']} payments. Your previous data was saved as {counts['safety_copy']}. "
+            "From now on, log in with the password that was used when this backup was made.")
+
+
+@bp.get("/settings/restore")
+def restore_page():
+    backups, error = [], ""
+    if gdrive.is_connected(_data_dir()):
+        try:
+            backups = gdrive.list_drive_backups(_data_dir())
+        except gdrive.DriveError as exc:
+            error = str(exc)
+    return render_template("settings/restore.html", backups=backups, error=error,
+                           connected=gdrive.is_connected(_data_dir()), has_data=_local_has_data())
+
+
+@bp.post("/settings/restore/drive/<file_id>")
+def restore_from_drive(file_id: str):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", file_id):
+        abort(404)
+    temp = _data_dir() / "restore_download.db"
+    try:
+        gdrive.download_backup(_data_dir(), file_id, temp)
+        counts = restore_database(current_app, temp)
+        message = _restored_message(counts, "Google Drive")
+        if request.form.get("designs"):
+            message += f" Design files downloaded: {gdrive.restore_uploads(_data_dir(), Path(current_app.config['UPLOAD_DIR']))}."
+    except (gdrive.DriveError, RestoreError) as exc:
+        flash(f"Restore failed: {exc}", "danger")
+        return redirect(url_for("settings.restore_page"))
+    finally:
+        temp.unlink(missing_ok=True)
+    audit("restore", None, "drive", message[:500])
+    db.session.commit()
+    flash(message, "success")
+    return redirect(url_for("settings.index"))
+
+
+@bp.post("/settings/restore/file")
+def restore_from_file():
+    upload = request.files.get("backup")
+    if not upload or not upload.filename:
+        flash("Choose a backup file (.db) first.", "danger")
+        return redirect(url_for("settings.restore_page"))
+    temp = _data_dir() / "restore_upload.db"
+    upload.save(temp)
+    try:
+        counts = restore_database(current_app, temp)
+    except RestoreError as exc:
+        flash(f"Restore failed: {exc}", "danger")
+        return redirect(url_for("settings.restore_page"))
+    finally:
+        temp.unlink(missing_ok=True)
+    message = _restored_message(counts, Path(upload.filename).name)
+    audit("restore", None, "file", message[:500])
+    db.session.commit()
+    flash(message, "success")
+    return redirect(url_for("settings.index"))
 
 
 @bp.post("/settings/gdrive/sync")

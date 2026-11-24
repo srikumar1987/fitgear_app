@@ -23,6 +23,10 @@ def test_custom_backup_folder_gets_backups_and_design_files(file_app, file_clien
     r = file_client.get("/settings/download-backup")
     assert r.status_code == 200 and r.data[:15] == b"SQLite format 3"
     r.close()
+    assert len(list_backups(file_app)) == 1                       # nothing changed: latest backup reused
+
+    file_client.post("/customers/new", data={"name": "New team"})
+    file_client.get("/settings/download-backup").close()
     assert len(list_backups(file_app)) == 2
 
     r = file_client.get("/settings/download-designs")
@@ -31,6 +35,17 @@ def test_custom_backup_folder_gets_backups_and_design_files(file_app, file_clien
 
     file_client.post("/settings/backup-folder", data={"folder": ""})
     assert "(default)" in file_client.get("/settings").get_data(as_text=True)
+
+
+def test_no_new_backup_without_changes(file_app, file_client):
+    r = file_client.post("/settings/backup", follow_redirects=True)
+    assert "Backup saved" in r.get_data(as_text=True)
+    r = file_client.post("/settings/backup", follow_redirects=True)
+    assert "No changes since the last backup" in r.get_data(as_text=True)
+    assert len(list_backups(file_app)) == 1
+    file_client.post("/customers/new", data={"name": "Changed"})
+    r = file_client.post("/settings/backup", follow_redirects=True)
+    assert "Backup saved" in r.get_data(as_text=True) and len(list_backups(file_app)) == 2
 
 
 def test_backup_folder_validation(file_app):

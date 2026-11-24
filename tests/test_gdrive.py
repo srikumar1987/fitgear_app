@@ -1,6 +1,7 @@
 """Google Drive link, tested against a fake Google (no network)."""
 import base64
 import json
+import re
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -69,12 +70,27 @@ class FakeGoogle:
             return ok({"id": fid})
         if method == "GET" and rest.startswith("/"):
             fid = rest[1:]
-            return ok({"id": fid, "trashed": self.files[fid]["trashed"]}) if fid in self.files else ok({}, 404)
+            if fid not in self.files:
+                return ok({}, 404)
+            f = self.files[fid]
+            if "alt=media" in parsed.query:
+                return 200, {}, f.get("content", b"")
+            return ok({"id": fid, "name": f["name"], "parents": f.get("parents", []), "trashed": f["trashed"]})
         if method == "GET":
-            q = parse_qs(parsed.query)["q"][0]
-            parent = q.split("'")[1]
-            found = [dict(id=k, name=v["name"]) for k, v in sorted(self.files.items(), key=lambda kv: -kv[1]["order"])
-                     if parent in v.get("parents", []) and gdrive.BACKUP_PREFIX in v["name"] and not v["trashed"]]
+            args = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+            q = args["q"]
+            parent = re.search(r"'([^']+)' in parents", q)
+            contains = re.search(r"name contains '([^']+)'", q)
+            equals = re.search(r"name = '([^']+)'", q)
+            newest_first = args.get("orderBy", "").endswith("desc")
+            found = []
+            for k, v in sorted(self.files.items(), key=lambda kv: kv[1]["order"], reverse=newest_first):
+                if v["trashed"] or (parent and parent.group(1) not in v.get("parents", [])) \
+                        or (contains and contains.group(1) not in v["name"]) or (equals and v["name"] != equals.group(1)) \
+                        or ("mimeType = " in q and v.get("mimeType") != gdrive.FOLDER_MIME):
+                    continue
+                found.append({"id": k, "name": v["name"], "size": str(len(v.get("content", b""))),
+                              "createdTime": f"2026-11-24T10:{v['order'] % 60:02d}:00.000Z"})
             return ok({"files": found})
         if method == "DELETE":
             self.files.pop(rest[1:], None)
@@ -94,14 +110,16 @@ def google(monkeypatch):
     gdrive._access.clear()
 
 
-def _connect(file_client):
+def _connect(file_client, with_data=True):
+    if with_data:  # empty databases are never uploaded, so most tests start with a customer
+        file_client.post("/customers/new", data={"name": "Vintage Warriors"})
     file_client.post("/settings/gdrive/client", content_type="multipart/form-data",
                      data={"client": (BytesIO(CLIENT_JSON.encode()), "client_secret.json")})
     r = file_client.get("/settings/gdrive/connect")
     params = {k: v[0] for k, v in parse_qs(urlparse(r.headers["Location"]).query).items()}
     r = file_client.get(f"/?code=abc&state={params['state']}")              # Google redirects to the app root
     assert "/settings/gdrive/callback" in r.headers["Location"]
-    file_client.get(r.headers["Location"])
+    params["after_connect"] = file_client.get(r.headers["Location"]).headers["Location"]
     return params
 
 
@@ -125,17 +143,19 @@ def test_connect_uploads_backup_and_design_files(file_app, file_client, google):
     page = file_client.get("/settings").get_data(as_text=True)
     assert "Connected" in page and "owner@gmail.com" in page
 
-    file_client.post("/settings/gdrive/sync")
-    assert len(google.named("tur_fitgear_")) == 2 and len(google.named("1_front")) == 1   # no re-upload
+    file_client.post("/settings/gdrive/sync")                                    # nothing changed
+    assert len(google.named("tur_fitgear_")) == 1 and len(google.named("1_front")) == 1   # no re-upload
 
-    file_client.post("/settings/backup")                                         # every backup goes to Drive
-    assert len(google.named("tur_fitgear_")) == 3
+    file_client.post("/customers/new", data={"name": "Blue Tigers"})
+    file_client.post("/settings/backup")                                         # new backups go to Drive
+    assert len(google.named("tur_fitgear_")) == 2
 
 
 def test_keeps_last_backups_and_recreates_deleted_folder(file_app, file_client, google, monkeypatch):
     monkeypatch.setattr(gdrive, "KEEP_BACKUPS", 2)
     _connect(file_client)
-    for _ in range(3):
+    for n in range(3):
+        file_client.post("/customers/new", data={"name": f"Team {n}"})
         file_client.post("/settings/gdrive/sync")
     assert len(google.named("tur_fitgear_")) == 2
 

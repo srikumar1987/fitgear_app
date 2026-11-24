@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 import sqlite3
+import threading
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -45,10 +48,13 @@ def check_backup_dir(app, folder: str) -> Path:
 def make_backup(app, cloud: bool = True) -> Path:
     """Copy the live database using SQLite's online backup API (safe while the app is running).
 
-    When Google Drive is connected the copy is also uploaded (in the background) unless cloud=False.
+    If nothing changed since the latest backup, no new file is kept and the latest backup is returned
+    (check with `is_new_backup`). When Google Drive is connected the backup is also uploaded (in the
+    background) unless cloud=False; an already-uploaded backup is not uploaded again.
     """
     dest_dir = backup_dir(app)
     dest_dir.mkdir(parents=True, exist_ok=True)
+    previous = list_backups(app)
     stamp = f"{PREFIX}{datetime.now():%Y%m%d_%H%M%S}"
     dest, n = dest_dir / f"{stamp}.db", 1
     while dest.exists():
@@ -61,8 +67,14 @@ def make_backup(app, cloud: bool = True) -> Path:
     finally:
         dest_conn.close()
         src_conn.close()
-    for old in list_backups(app)[app.config["BACKUP_KEEP"]:]:
-        old.unlink(missing_ok=True)
+    if previous and _sha256(dest) == _sha256(previous[0]):
+        dest.unlink()  # no changes since the latest backup
+        dest = previous[0]
+        app.config["LAST_BACKUP_NEW"] = False
+    else:
+        app.config["LAST_BACKUP_NEW"] = True
+        for old in list_backups(app)[app.config["BACKUP_KEEP"]:]:
+            old.unlink(missing_ok=True)
     if custom_backup_dir():
         mirror_uploads(app, dest_dir)
     app.config["LAST_BACKUP_DAY"] = date.today()
@@ -74,6 +86,30 @@ def make_backup(app, cloud: bool = True) -> Path:
             args = (data_dir, dest, Path(app.config["UPLOAD_DIR"]))
             gdrive.safe_sync(*args) if app.testing else gdrive.sync_in_background(*args)
     return dest
+
+
+def is_new_backup(app) -> bool:
+    """Whether the last make_backup call saved a new file (False = nothing had changed)."""
+    return bool(app.config.get("LAST_BACKUP_NEW"))
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def start_daily_timer(app, every_seconds: int = 1800) -> None:
+    """Check every 30 minutes, so the daily backup happens even on days nobody opens the app."""
+    def loop():
+        while True:
+            time.sleep(every_seconds)
+            with app.app_context():
+                backup_if_due(app)
+
+    threading.Thread(target=loop, daemon=True, name="daily-backup").start()
 
 
 def mirror_uploads(app, dest_dir: Path) -> int:

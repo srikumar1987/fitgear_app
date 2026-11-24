@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import secrets
+import sqlite3
 import ssl
 import threading
 import time
@@ -71,9 +72,18 @@ def _read(path: Path) -> dict:
 
 
 def _write(path: Path, data: dict) -> None:
+    """Write via a temp file. Windows may briefly lock the target (antivirus, indexing), so retry."""
+    text = json.dumps(data, indent=1)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
-    tmp.replace(path)
+    tmp.write_text(text, encoding="utf-8")
+    for attempt in range(10):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            time.sleep(0.05 * (attempt + 1))
+    path.write_text(text, encoding="utf-8")  # last resort: write in place
+    tmp.unlink(missing_ok=True)
 
 
 def _b64url(raw: bytes) -> str:
@@ -290,16 +300,62 @@ def _create_folder(token: str, name: str, parent: str | None = None) -> str:
                       _auth(token, {"Content-Type": "application/json; charset=UTF-8"})), "Creating the Drive folder")["id"]
 
 
+def _list(token: str, query: str, fields: str = "id,name", order: str = "createdTime desc") -> list[dict]:
+    """All files matching a Drive query (follows pages)."""
+    found, page = [], None
+    while True:
+        params = {"q": query, "orderBy": order, "pageSize": 1000, "fields": f"nextPageToken,files({fields})"}
+        if page:
+            params["pageToken"] = page
+        data = _json(http("GET", f"{API_URL}?{urllib.parse.urlencode(params, quote_via=urllib.parse.quote)}",
+                          headers=_auth(token)), "Listing Drive files")
+        found += data.get("files", [])
+        page = data.get("nextPageToken")
+        if not page:
+            return found
+
+
+def _find_folder(token: str, name: str, parent: str | None = None) -> str | None:
+    """An existing folder this app created before, e.g. from another PC using the same Google client."""
+    query = f"name = '{name}' and mimeType = '{FOLDER_MIME}' and trashed = false"
+    if parent:
+        query += f" and '{parent}' in parents"
+    matches = _list(token, query, order="createdTime")
+    return matches[0]["id"] if matches else None
+
+
 def _folders(data_dir: Path, token: str) -> tuple[str, str]:
-    """The 'TUR fitgear backups' folder and its 'uploads' subfolder (re-created if deleted)."""
+    """The 'TUR fitgear backups' folder and its 'uploads' subfolder: reuse existing ones, create if missing."""
     state_file = _files(data_dir)[2]
     state = _read(state_file)
     if not _folder_ok(token, state.get("folder_id")):
-        state.update(folder_id=_create_folder(token, FOLDER_NAME), uploads_folder_id=None, uploads=[], backups=[])
+        state.update(folder_id=_find_folder(token, FOLDER_NAME) or _create_folder(token, FOLDER_NAME),
+                     uploads_folder_id=None, backups=[])
     if not _folder_ok(token, state.get("uploads_folder_id")):
-        state.update(uploads_folder_id=_create_folder(token, "uploads", state["folder_id"]), uploads=[])
+        existing = _find_folder(token, "uploads", state["folder_id"])
+        state["uploads_folder_id"] = existing or _create_folder(token, "uploads", state["folder_id"])
+        # remember what is already in Drive so it is not uploaded twice
+        state["uploads"] = [f["name"] for f in _list(token, f"'{existing}' in parents and trashed = false")] \
+            if existing else []
     _write(state_file, state)
     return state["folder_id"], state["uploads_folder_id"]
+
+
+def readonly_uri(db_file: Path) -> str:
+    """SQLite read-only URI; paths with spaces (e.g. 'OneDrive - Dell Technologies') are escaped."""
+    return "file:" + urllib.parse.quote(Path(db_file).resolve().as_posix(), safe="/:") + "?mode=ro"
+
+
+def has_data(db_file: Path) -> bool:
+    """True if a database file holds at least one customer or order (empty new installs are not uploaded)."""
+    try:
+        conn = sqlite3.connect(readonly_uri(db_file), uri=True)
+        try:
+            return any(conn.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone() for table in ("customer", "orders"))
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
 
 
 def _upload(token: str, path: Path, parent: str, mime: str) -> str:
@@ -351,9 +407,12 @@ def sync(data_dir: Path, backup_file: Path | None, upload_dir: Path) -> str:
             state = _read(state_file)
             done = []
             if backup_file and Path(backup_file).is_file() and backup_file.name not in state.get("backups", []):
-                _upload(token, Path(backup_file), folder_id, "application/x-sqlite3")
-                state["backups"] = (state.get("backups", []) + [backup_file.name])[-100:]
-                done.append("backup " + backup_file.name)
+                if has_data(backup_file):  # never let an empty new install become the "latest" backup
+                    _upload(token, Path(backup_file), folder_id, "application/x-sqlite3")
+                    state["backups"] = (state.get("backups", []) + [backup_file.name])[-100:]
+                    done.append("backup " + backup_file.name)
+                else:
+                    done.append("no backup (no orders or customers yet)")
             uploaded = set(state.get("uploads", []))
             new_files = [f for f in sorted(Path(upload_dir).glob("*")) if f.is_file() and f.name not in uploaded] \
                 if Path(upload_dir).is_dir() else []
@@ -375,6 +434,65 @@ def sync(data_dir: Path, backup_file: Path | None, upload_dir: Path) -> str:
             _write(state_file, {**_read(state_file), "last_error": str(exc),
                                 "last_error_at": datetime.now().isoformat(timespec="seconds")})
             raise
+
+
+# ---------------------------------------------------------------- restore
+
+def list_drive_backups(data_dir: Path) -> list[dict]:
+    """Database backups in the Drive folder, newest first: id, name, size (bytes), created (datetime)."""
+    with _lock:
+        token = _access_token(data_dir)
+        folder_id, _ = _folders(data_dir, token)
+        files = _list(token, f"'{folder_id}' in parents and name contains '{BACKUP_PREFIX}' and trashed = false",
+                      fields="id,name,size,createdTime")
+    for f in files:
+        f["size"] = int(f.get("size") or 0)
+        try:
+            f["created"] = datetime.strptime(f.get("createdTime", "")[:19], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            f["created"] = None
+    return files
+
+
+def _download(token: str, file_id: str, dest: Path) -> None:
+    status_code, headers, body = http("GET", f"{API_URL}/{urllib.parse.quote(file_id)}?alt=media",
+                                      headers=_auth(token), timeout=600)
+    if status_code >= 400:
+        _json((status_code, headers, body), "Downloading from Drive")
+    dest.write_bytes(body)
+
+
+def download_backup(data_dir: Path, file_id: str, dest: Path) -> None:
+    """Download one backup; it must be in this app's Drive backup folder."""
+    with _lock:
+        token = _access_token(data_dir)
+        folder_id, _ = _folders(data_dir, token)
+        meta = _json(http("GET", f"{API_URL}/{urllib.parse.quote(file_id)}?fields=id,name,parents,trashed",
+                          headers=_auth(token)), "Finding the backup in Drive")
+        if folder_id not in meta.get("parents", []) or meta.get("trashed") \
+                or not meta.get("name", "").startswith(BACKUP_PREFIX):
+            raise DriveError("That file is not one of the app's backups in Google Drive.")
+        _download(token, file_id, dest)
+
+
+def restore_uploads(data_dir: Path, upload_dir: Path) -> int:
+    """Download design / after-print files from Drive that are missing on this PC."""
+    upload_dir = Path(upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    with _lock:
+        token = _access_token(data_dir)
+        _, uploads_id = _folders(data_dir, token)
+        state_file = _files(data_dir)[2]
+        count = 0
+        for f in _list(token, f"'{uploads_id}' in parents and trashed = false"):
+            name = Path(f["name"]).name  # never trust a path from outside
+            if name and not (upload_dir / name).exists():
+                _download(token, f["id"], upload_dir / name)
+                count += 1
+        state = _read(state_file)
+        state["uploads"] = sorted(set(state.get("uploads", [])) | {p.name for p in upload_dir.iterdir() if p.is_file()})
+        _write(state_file, state)
+    return count
 
 
 def safe_sync(data_dir: Path, backup_file: Path | None, upload_dir: Path) -> None:

@@ -69,12 +69,14 @@ Then stop the app and run `start.bat` again. Your data is not stored in this fol
 |---|---|
 | Live database, secret key, log | `%LOCALAPPDATA%\TURfitgear\data\` (kept out of OneDrive and Google Drive, because syncing an open database can corrupt it) |
 | Python environment | `%LOCALAPPDATA%\TURfitgear\venv\` |
-| Backups | `backups\` in this folder by default, or the folder chosen in **Settings → Backups** (for example `G:\My Drive\TUR fitgear backups` with Google Drive for desktop). Made on start, daily and on stop; the last 30 are kept |
+| Backups | `backups\` in this folder by default, or the folder chosen in **Settings → Backups** (for example `G:\My Drive\TUR fitgear backups` with Google Drive for desktop). Made on start, once a day (a timer checks every 30 minutes, even if nobody opens the app) and on stop, **only if the data changed** since the last backup; the last 30 are kept |
 | Design / after-print files | `uploads\` in this folder |
 
 `backups\` and `uploads\` hold real business data and are **git-ignored**.
 
-**Restore a backup:** stop the app, copy a backup file over `tur_fitgear.db` in the data folder, then start again.
+**Restore a backup:** go to **Settings → Restore…**. You can pick a backup from Google Drive (newest first, design files included) or upload a `.db` backup file. The app checks the file, saves a safety copy of the current data first, then replaces it. Afterwards, log in with the password that was used when the backup was made.
+
+**Moving to a new PC:** install the app, set any password, connect Google Drive with the **same Google account and the same client JSON file**, then restore the latest backup when the app offers it. An empty new install is never uploaded, so it can't replace your real "latest" backup.
 
 ### Google Drive (direct link, no Drive app needed)
 

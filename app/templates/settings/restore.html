@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Restore{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="page-title">Restore data</h1>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.index') }}">← Settings</a>
+</div>
+
+<div class="alert {{ 'alert-warning' if has_data else 'alert-info' }} small">
+  Restoring <strong>replaces all data in this app</strong> (orders, customers, payments, settings) with the backup.
+  {% if has_data %}This PC already has data: a safety copy of it is saved first, so you can go back.{% else %}This app has no orders or customers yet, so nothing is lost.{% endif %}
+  After restoring, log in with the <strong>password that was used when the backup was made</strong>.
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">From Google Drive</h2>
+        {% if not connected %}
+          <p class="small text-muted mb-0">Connect Google Drive first (Settings → Google Drive) with the same Google account and the same Google client file used on the other PC.</p>
+        {% elif error %}
+          <div class="alert alert-danger py-2 small mb-0">{{ error }}</div>
+        {% elif not backups %}
+          <p class="small text-muted mb-0">No backups found in the “TUR fitgear backups” folder of this Google account.</p>
+        {% else %}
+          <table class="table table-sm">
+            <thead><tr><th>Backup</th><th>Saved</th><th class="num">Size</th><th></th></tr></thead>
+            <tbody>
+            {% for b in backups %}
+              <tr>
+                <td class="small">{{ b.name }}{% if loop.first %} <span class="status st-paid">Latest</span>{% endif %}</td>
+                <td class="small text-nowrap">{{ b.created.strftime('%d %b %Y %H:%M') ~ ' UTC' if b.created else '-' }}</td>
+                <td class="num small">{{ (b.size // 1024) or 1 }} KB</td>
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('settings.restore_from_drive', file_id=b.id) }}" class="d-flex gap-2 justify-content-end align-items-center"
+                        data-confirm="Replace all data in this app with {{ b.name }}?">
+                    <label class="small text-nowrap"><input type="checkbox" name="designs" value="1" checked> + design files</label>
+                    <button class="btn btn-sm {{ 'btn-brand' if loop.first else 'btn-outline-secondary' }}">Restore</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          <p class="small text-muted mb-0">Times are shown as Google stores them (UTC; India is UTC+5:30). The newest backup is at the top.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">From a backup file</h2>
+        <p class="small text-muted">A <code>tur_fitgear_….db</code> file from the backups folder, from “Download latest backup”, or downloaded from Google Drive by hand.</p>
+        <form method="post" action="{{ url_for('settings.restore_from_file') }}" enctype="multipart/form-data"
+              data-confirm="Replace all data in this app with the chosen backup file?">
+          <input type="file" name="backup" accept=".db" class="form-control form-control-sm mb-2" required aria-label="Backup file">
+          <button class="btn btn-sm btn-outline-secondary">Restore from file</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

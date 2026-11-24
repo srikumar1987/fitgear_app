@@ -50,7 +50,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     db.init_app(app)
 
     from . import models  # noqa: F401
-    from .backup import backup_if_due
+    from .backup import backup_if_due, start_daily_timer
     from .formatting import register_filters
     from .views import auth, balances, designs, directory, orders, payments, reports, settings
 
@@ -62,6 +62,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         db.create_all()
         if not app.testing:
             backup_if_due(app, force=True)
+    if not app.testing:
+        start_daily_timer(app)
 
     @app.before_request
     def require_login():

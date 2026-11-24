@@ -48,7 +48,7 @@
     <div class="card">
       <div class="card-body">
         <h2 class="card-title">Backups</h2>
-        <p class="small text-muted mb-2">A copy is made automatically when the app starts, once a day and when you stop it. The last 30 are kept.</p>
+        <p class="small text-muted mb-2">A copy is made automatically when the app starts, once a day (even if nobody opens it) and when you stop it, but only if something changed since the last copy. The last 30 are kept.</p>
         <dl class="small row mb-2">
           <dt class="col-sm-3">Backups go to</dt><dd class="col-sm-9 text-break">{{ backup_dir }}{% if not custom_dir %} <span class="text-muted">(default)</span>{% endif %}</dd>
           <dt class="col-sm-3">Live database</dt><dd class="col-sm-9 text-break">{{ data_dir }}</dd>
@@ -72,6 +72,7 @@
           <form method="post" action="{{ url_for('settings.backup_now') }}"><button class="btn btn-sm btn-brand">Back up now</button></form>
           <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.download_backup') }}">Download latest backup</a>
           <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.download_designs') }}">Download design files (.zip)</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.restore_page') }}">Restore…</a>
         </div>
         <p class="small text-muted">No Google Drive app on this PC? Download the backup and design files here and upload them at drive.google.com, for example once a week.</p>
         <table class="table table-sm">
@@ -102,6 +103,7 @@
           <p class="small text-muted">Every backup (on start, daily and on stop) and every new design file is uploaded automatically. Drive keeps the last 30 backups.</p>
           <div class="d-flex gap-2">
             <form method="post" action="{{ url_for('settings.gdrive_sync') }}"><button class="btn btn-sm btn-brand">Upload now</button></form>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.restore_page') }}">Restore from Google Drive</a>
             <form method="post" action="{{ url_for('settings.gdrive_disconnect') }}" data-confirm="Disconnect Google Drive? Files already in your Drive stay there.">
               <button class="btn btn-sm btn-outline-danger">Disconnect</button>
             </form>
@@ -125,6 +127,7 @@
             <li><strong>Clients → Create client</strong>: application type <strong>Desktop app</strong>, name “TUR fitgear”, then <strong>Create</strong> and <strong>Download JSON</strong>.</li>
             <li>Choose that file below and click <strong>Save client</strong>, then <strong>Connect Google Drive</strong>.</li>
           </ol>
+          <p class="small text-muted"><strong>Keep the downloaded JSON file safe</strong> (e.g. email it to yourself). To restore on a new PC, use the same Google account and this same file.</p>
           <form method="post" action="{{ url_for('settings.gdrive_client') }}" enctype="multipart/form-data" class="d-flex gap-2">
             <input type="file" name="client" accept=".json,application/json" class="form-control form-control-sm" required aria-label="Google client JSON file">
             <button class="btn btn-sm btn-brand text-nowrap">Save client</button>
