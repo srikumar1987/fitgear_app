@@ -44,6 +44,18 @@ class DriveError(Exception):
     """A problem worth showing to the user as-is."""
 
 
+class MissingPermission(DriveError):
+    """Signed in, but the Google Drive checkbox was not ticked on Google's consent page."""
+
+
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+MISSING_PERMISSION = (
+    "Google did not give the app permission to use Drive. Click 'Connect Google Drive' again and, on "
+    "Google's page, tick the box 'See, edit, create, and delete only the specific Google Drive files "
+    "you use with this app' (or 'Select all') before clicking Continue."
+)
+
+
 # ---------------------------------------------------------------- small helpers
 
 def _files(data_dir: Path) -> tuple[Path, Path, Path]:
@@ -101,6 +113,8 @@ def _json(response: tuple[int, dict, bytes], what: str) -> dict:
     if status >= 400:
         err = data.get("error")
         detail = (err.get("message") if isinstance(err, dict) else data.get("error_description") or err) or body[:200]
+        if status == 403 and "insufficient" in str(detail).lower() and "scope" in str(detail).lower():
+            raise MissingPermission(MISSING_PERMISSION)
         raise DriveError(f"{what} failed ({status}): {detail}")
     return data
 
@@ -183,6 +197,10 @@ def connect(data_dir: Path, code: str, redirect_uri: str, verifier: str) -> str:
         "client_id": client.get("client_id", ""), "client_secret": client.get("client_secret", ""),
         "code": code, "code_verifier": verifier, "redirect_uri": redirect_uri, "grant_type": "authorization_code",
     }), {"Content-Type": "application/x-www-form-urlencoded"}), "Google sign-in")
+    granted = tokens.get("scope")
+    if granted is not None and DRIVE_SCOPE not in granted.split():
+        _revoke(tokens.get("refresh_token") or tokens.get("access_token"))
+        raise MissingPermission(MISSING_PERMISSION)
     if not tokens.get("refresh_token"):
         raise DriveError("Google did not give long-term access. Remove 'TUR fitgear' at "
                          "myaccount.google.com/permissions and connect again.")
@@ -192,24 +210,33 @@ def connect(data_dir: Path, code: str, redirect_uri: str, verifier: str) -> str:
                         "connected_at": datetime.now().isoformat(timespec="seconds")})
     _access[str(data_dir)] = (tokens.get("access_token", ""), time.time() + int(tokens.get("expires_in", 0)) - 60)
     _write(state_file, {})
-    with _lock:
-        _folders(data_dir, _access_token(data_dir))
+    try:
+        with _lock:
+            _folders(data_dir, _access_token(data_dir))
+    except MissingPermission:
+        disconnect(data_dir)
+        raise
     return email
 
 
 def disconnect(data_dir: Path) -> None:
     """Revoke the app's access at Google (best effort) and forget the account."""
     _, token_file, state_file = _files(data_dir)
-    refresh = _read(token_file).get("refresh_token")
-    if refresh:
-        try:
-            http("POST", REVOKE_URL, _form({"token": refresh}), {"Content-Type": "application/x-www-form-urlencoded"},
-                 timeout=20)
-        except DriveError:
-            pass
+    _revoke(_read(token_file).get("refresh_token"))
     for path in (token_file, state_file):
         path.unlink(missing_ok=True)
     _access.pop(str(data_dir), None)
+
+
+def _revoke(token: str | None) -> None:
+    """Best effort: tell Google to drop this app's access."""
+    if not token:
+        return
+    try:
+        http("POST", REVOKE_URL, _form({"token": token}), {"Content-Type": "application/x-www-form-urlencoded"},
+             timeout=20)
+    except DriveError:
+        pass
 
 
 def remove_client(data_dir: Path) -> None:
@@ -341,6 +368,10 @@ def sync(data_dir: Path, backup_file: Path | None, upload_dir: Path) -> str:
             _write(state_file, state)
             return ", ".join(done) or "everything was already uploaded"
         except DriveError as exc:
+            if isinstance(exc, MissingPermission):  # half-working sign-in: forget it so Settings offers Connect again
+                _revoke(_read(_files(data_dir)[1]).get("refresh_token"))
+                _files(data_dir)[1].unlink(missing_ok=True)
+                _access.pop(str(data_dir), None)
             _write(state_file, {**_read(state_file), "last_error": str(exc),
                                 "last_error_at": datetime.now().isoformat(timespec="seconds")})
             raise

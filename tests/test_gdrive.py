@@ -22,6 +22,8 @@ class FakeGoogle:
         self.files, self.sessions, self.revoked, self.n = {}, {}, [], 0
         self.refresh_fails = False
         self.verifiers = []
+        self.granted = gdrive.SCOPES             # what the user ticked on Google's consent page
+        self.token_scope_ok = True               # whether issued tokens can really use Drive
 
     def _id(self):
         self.n += 1
@@ -38,7 +40,7 @@ class FakeGoogle:
             form = {k: v[0] for k, v in parse_qs(data.decode()).items()}
             if form["grant_type"] == "authorization_code":
                 self.verifiers.append(form["code_verifier"])
-                return ok({"access_token": "at1", "expires_in": 3600, "refresh_token": "rt1",
+                return ok({"access_token": "at1", "expires_in": 3600, "refresh_token": "rt1", "scope": self.granted,
                            "id_token": _jwt({"email": "owner@gmail.com"})})
             if self.refresh_fails:
                 return ok({"error": "invalid_grant"}, 400)
@@ -56,6 +58,9 @@ class FakeGoogle:
             self.files[fid] = {**meta, "content": data, "mime": headers["Content-Type"], "trashed": False, "order": self.n}
             return ok({"id": fid})
         assert headers and headers.get("Authorization", "").startswith("Bearer ")
+        if not self.token_scope_ok:
+            return ok({"error": {"code": 403, "message": "Request had insufficient authentication scopes.",
+                                 "status": "PERMISSION_DENIED"}}, 403)
         rest = parsed.path[len("/drive/v3/files"):]
         if method == "POST":
             meta = json.loads(data)
@@ -168,6 +173,24 @@ def test_wrong_state_and_bad_client_files(file_app, file_client, google):
     file_client.get("/settings/gdrive/connect")
     r = file_client.get("/settings/gdrive/callback?code=abc&state=forged", follow_redirects=True)
     assert "expired" in r.get_data(as_text=True)
+    assert not gdrive.is_connected(Path(file_app.config["DATA_DIR"]))
+
+
+def test_drive_box_not_ticked_is_explained_and_not_connected(file_app, file_client, google):
+    google.granted = "openid https://www.googleapis.com/auth/userinfo.email"     # Drive checkbox left unticked
+    _connect(file_client)
+    page = file_client.get("/settings").get_data(as_text=True)
+    assert "tick the box" in page and "Connect Google Drive" in page
+    data_dir = Path(file_app.config["DATA_DIR"])
+    assert not gdrive.is_connected(data_dir)
+    assert google.revoked == ["rt1"] and not google.named("tur_fitgear_")
+
+
+def test_insufficient_scope_later_asks_to_reconnect(file_app, file_client, google):
+    _connect(file_client)
+    google.token_scope_ok = False                 # e.g. permission removed or an old token
+    r = file_client.post("/settings/gdrive/sync", follow_redirects=True)
+    assert "tick the box" in r.get_data(as_text=True)
     assert not gdrive.is_connected(Path(file_app.config["DATA_DIR"]))
 
 
