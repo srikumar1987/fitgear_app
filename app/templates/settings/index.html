@@ -48,12 +48,32 @@
     <div class="card">
       <div class="card-body">
         <h2 class="card-title">Backups</h2>
-        <p class="small text-muted mb-2">A copy is made automatically when the app starts and once a day. The last 30 are kept.</p>
+        <p class="small text-muted mb-2">A copy is made automatically when the app starts, once a day and when you stop it. The last 30 are kept.</p>
         <dl class="small row mb-2">
-          <dt class="col-sm-3">Backup folder</dt><dd class="col-sm-9 text-break">{{ backup_dir }}</dd>
+          <dt class="col-sm-3">Backups go to</dt><dd class="col-sm-9 text-break">{{ backup_dir }}{% if not custom_dir %} <span class="text-muted">(default)</span>{% endif %}</dd>
           <dt class="col-sm-3">Live database</dt><dd class="col-sm-9 text-break">{{ data_dir }}</dd>
         </dl>
-        <form method="post" action="{{ url_for('settings.backup_now') }}" class="mb-3"><button class="btn btn-sm btn-brand">Back up now</button></form>
+
+        <form method="post" action="{{ url_for('settings.save_backup_folder') }}" class="border rounded p-2 mb-3 bg-light">
+          <label class="form-label" for="backup-folder">Backup folder, e.g. a Google Drive folder</label>
+          <div class="d-flex gap-2">
+            <input id="backup-folder" name="folder" class="form-control form-control-sm" value="{{ custom_dir }}"
+                   placeholder="G:\My Drive\TUR fitgear backups   (leave empty for the default)">
+            <button class="btn btn-sm btn-outline-secondary text-nowrap">Save folder</button>
+          </div>
+          <div class="small text-muted mt-1">
+            With <strong>Google Drive for desktop</strong> installed, pick a folder inside your Drive (in File Explorer, open the folder and copy the address bar).
+            Each backup, plus a copy of the design / after-print files, then goes to Google Drive automatically.
+            Never point Google Drive at the live database folder.
+          </div>
+        </form>
+
+        <div class="d-flex gap-2 flex-wrap mb-3">
+          <form method="post" action="{{ url_for('settings.backup_now') }}"><button class="btn btn-sm btn-brand">Back up now</button></form>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.download_backup') }}">Download latest backup</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('settings.download_designs') }}">Download design files (.zip)</a>
+        </div>
+        <p class="small text-muted">No Google Drive app on this PC? Download the backup and design files here and upload them at drive.google.com, for example once a week.</p>
         <table class="table table-sm">
           <thead><tr><th>Latest backups</th><th>Time</th><th class="num">Size</th></tr></thead>
           <tbody>

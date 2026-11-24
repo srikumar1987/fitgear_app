@@ -17,7 +17,7 @@ An internal web app for managing sportswear and jersey orders: customers, size s
 | **Balances** (home) | *To collect* from customers and *To pay* vendors, with an ageing filter (overdue, due in 7 days, 1–15 / 16–30 / 31–60 / 60+ days), a side panel per party, and a net position |
 | **Receive / Pay** | One payment form that splits the amount across open orders (oldest first, editable) |
 | **Orders** | Items with per-piece, lump-sum or mixed pricing; status; order, delivery and payment-due dates |
-| **Items & Sizes** | Editable size grid, paste from Excel (detects the header row, normalises sizes such as 3XL → XXXL), live size summary, warnings for duplicate or odd jersey numbers and missing sizes |
+| **Items & Sizes** | **Paste the team's player list** (P.NO, Name, Name on Jersey, Number on Jersey, T Shirt Size, Tshirt Sleeve, Track Size): jerseys are split into items by sleeve and a Track pants item is filled from Track Size. Also an editable size grid, per-item paste from Excel, size normalising (3XL → XXXL), a live size summary, and warnings for duplicate or odd jersey numbers and missing sizes |
 | **Quotation** | Saved versions, *Mark approved*, a print / save-as-PDF page with the logo, adjustments (extra charges, discounts) |
 | **Designs** | Upload or **paste (Ctrl+V)** design mockups and after-print photos; mark the approved design |
 | **Vendors** | Allocate each item to a vendor; agreed cost as one total or **priced by option** (half sleeve, full sleeve, track pant, …); actual cost; received and pay-by dates |
@@ -25,7 +25,7 @@ An internal web app for managing sportswear and jersey orders: customers, size s
 | **Statements** | Printable statement per customer or vendor, plus text you can copy into WhatsApp |
 | **Reports** | Every order grouped by year (billed, spent, received, profit, profit %) with Excel download |
 | **Old reports** | Import older Excel/CSV order sheets: columns are guessed, you confirm with a preview, and the rows are imported. Read locally, no internet |
-| **Settings** | Size scale, backup now, full Excel export, change password, stop the app |
+| **Settings** | Size scale; **backup folder** (e.g. a Google Drive folder; design files are copied there too); backup now; download the latest backup or the design files as a zip; full Excel export; change password; stop the app |
 
 Money rules (always calculated, never typed in):
 
@@ -69,7 +69,7 @@ Then stop the app and run `start.bat` again. Your data is not stored in this fol
 |---|---|
 | Live database, secret key, log | `%LOCALAPPDATA%\TURfitgear\data\` (kept out of OneDrive and Google Drive, because syncing an open database can corrupt it) |
 | Python environment | `%LOCALAPPDATA%\TURfitgear\venv\` |
-| Backups | `backups\` in this folder. Made on start, daily and on stop; the last 30 are kept |
+| Backups | `backups\` in this folder by default, or the folder chosen in **Settings → Backups** (for example `G:\My Drive\TUR fitgear backups` with Google Drive for desktop). Made on start, daily and on stop; the last 30 are kept |
 | Design / after-print files | `uploads\` in this folder |
 
 `backups\` and `uploads\` hold real business data and are **git-ignored**.

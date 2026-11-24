@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
+import zipfile
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, url_for
 from sqlalchemy import select
 from werkzeug.security import check_password_hash
 
 from .. import db
-from ..backup import list_backups, make_backup
+from ..backup import backup_dir, check_backup_dir, custom_backup_dir, list_backups, make_backup
 from ..export import build_workbook
-from ..models import Admin, set_setting
+from ..models import Admin, audit, set_setting
 from ..sizes import get_scale, normalise_size
 from .auth import MIN_PASSWORD, hash_password
 
@@ -26,8 +29,56 @@ def index():
     ]
     return render_template(
         "settings/index.html", scale=", ".join(get_scale()), backups=backups,
-        backup_dir=current_app.config["BACKUP_DIR"], data_dir=current_app.config["DATA_DIR"],
+        backup_dir=backup_dir(current_app), custom_dir=custom_backup_dir(),
+        default_dir=current_app.config["BACKUP_DIR"], data_dir=current_app.config["DATA_DIR"],
     )
+
+
+@bp.post("/settings/backup-folder")
+def save_backup_folder():
+    folder = request.form.get("folder", "").strip()
+    if not folder:
+        set_setting("backup_dir", "")
+        db.session.commit()
+        flash(f"Backups go to the default folder again: {current_app.config['BACKUP_DIR']}", "success")
+        return redirect(url_for("settings.index"))
+    try:
+        path = check_backup_dir(current_app, folder)
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("settings.index"))
+    set_setting("backup_dir", str(path))
+    audit("setting", None, "backup_dir", str(path))
+    db.session.commit()
+    try:
+        saved = make_backup(current_app)
+    except Exception as exc:  # shown to the single admin so they can fix the folder
+        flash(f"Folder saved, but the first backup failed: {exc}", "danger")
+    else:
+        flash(f"Backups now go to {path}. First backup saved ({saved.name}); design files copied too.", "success")
+    return redirect(url_for("settings.index"))
+
+
+@bp.get("/settings/download-backup")
+def download_backup():
+    path = make_backup(current_app)
+    return send_file(path, as_attachment=True, download_name=path.name, mimetype="application/octet-stream")
+
+
+@bp.get("/settings/download-designs")
+def download_designs():
+    folder = Path(current_app.config["UPLOAD_DIR"])
+    files = [f for f in folder.iterdir() if f.is_file()] if folder.is_dir() else []
+    if not files:
+        flash("There are no design or after-print files yet.", "danger")
+        return redirect(url_for("settings.index"))
+    archive = tempfile.TemporaryFile()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_STORED) as zf:  # images are already compressed
+        for file in files:
+            zf.write(file, file.name)
+    archive.seek(0)
+    return send_file(archive, as_attachment=True, mimetype="application/zip",
+                     download_name=f"tur_fitgear_designs_{datetime.now():%Y%m%d}.zip")
 
 
 @bp.post("/settings/sizes")

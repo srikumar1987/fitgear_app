@@ -12,7 +12,8 @@ Internal order, size-sheet and payments app for one administrator. The plan is i
 ## Paths
 - Live database and secret key: `%LOCALAPPDATA%\TURfitgear\data` (override with `TUR_DATA_DIR`). Keep it out of OneDrive.
 - Virtual environment: `%LOCALAPPDATA%\TURfitgear\venv` (created by `start.bat`).
-- Backups: `./backups` (override with `TUR_BACKUP_DIR`). Made on startup and daily; the last 30 are kept.
+- Backups: `./backups` (override with `TUR_BACKUP_DIR`), or the `backup_dir` setting chosen in Settings (e.g. a Google Drive for desktop folder), which takes precedence. Made on startup, daily and on stop; the last 30 are kept. When a custom folder is set, uploads are mirrored to `<backup folder>/uploads` (copy only, never deleted). `check_backup_dir` refuses relative paths and anything inside the live data folder.
+- Paste: `parse_player_list` handles the team sheet (P.NO, Name, Name on Jersey, Number on Jersey, T Shirt Size, Tshirt Sleeve, Track Size). "Number on Jersey" outranks "P.No"; top vs bottom sizes are told apart by TRACK_WORDS. Cells are split with `csv`, so quoted multi-line Excel cells stay in one row.
 - Design / after-print uploads: `./uploads` (override with `TUR_UPLOAD_DIR`). It sits inside the OneDrive folder, so files are synced off the machine. Images and PDF only, 25 MB per request; stored as `<order>_<uuid>.<ext>`, served only to a logged-in user via `/files/<id>`.
 
 ## Commands
