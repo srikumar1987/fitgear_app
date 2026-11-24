@@ -5,27 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app import create_app, db
 from app.backup import check_backup_dir, list_backups
-
-
-@pytest.fixture()
-def file_app(tmp_path, monkeypatch):
-    monkeypatch.setenv("TUR_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("TUR_BACKUP_DIR", str(tmp_path / "backups"))
-    monkeypatch.setenv("TUR_UPLOAD_DIR", str(tmp_path / "uploads"))
-    app = create_app({"TESTING": True, "SECRET_KEY": "test"})   # real SQLite file in the data folder
-    with app.app_context():
-        yield app
-        db.session.remove()
-        db.engine.dispose()
-
-
-@pytest.fixture()
-def file_client(file_app):
-    client = file_app.test_client()
-    client.post("/setup", data={"password": "secret1", "confirm": "secret1"})
-    return client
 
 
 def test_custom_backup_folder_gets_backups_and_design_files(file_app, file_client, tmp_path):

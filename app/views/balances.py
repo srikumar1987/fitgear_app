@@ -14,6 +14,9 @@ bp = Blueprint("balances", __name__)
 
 @bp.get("/")
 def home():
+    # Google sends the browser back to the app's root address after "Connect Google Drive".
+    if request.args.get("state") and ("code" in request.args or "error" in request.args):
+        return redirect(url_for("settings.gdrive_callback", **request.args.to_dict()))
     return redirect(url_for("balances.index"))
 
 

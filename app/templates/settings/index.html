@@ -87,6 +87,52 @@
         <p class="small text-muted mb-0">To restore: close the app, copy a backup file over <code>tur_fitgear.db</code> in the live database folder, then start the app again.</p>
       </div>
     </div>
+
+    <div class="card mt-3" id="gdrive">
+      <div class="card-body">
+        <h2 class="card-title">Google Drive (direct link)</h2>
+        {% if drive.connected %}
+          <p class="mb-2"><span class="status st-paid">Connected</span> as <strong>{{ drive.email or 'your Google account' }}</strong></p>
+          <dl class="small row mb-2">
+            <dt class="col-sm-4">Drive folder</dt><dd class="col-sm-8">“{{ drive.folder }}” (with an “uploads” folder for design files)</dd>
+            <dt class="col-sm-4">Last upload</dt><dd class="col-sm-8">{{ drive.last_sync.replace('T', ' ') if drive.last_sync else 'Not yet' }}{% if drive.last_backup %} · {{ drive.last_backup }}{% endif %}</dd>
+            <dt class="col-sm-4">Design files uploaded</dt><dd class="col-sm-8">{{ drive.uploaded_files }}</dd>
+          </dl>
+          {% if drive.last_error %}<div class="alert alert-danger py-2 small">Last upload failed: {{ drive.last_error }}</div>{% endif %}
+          <p class="small text-muted">Every backup (on start, daily and on stop) and every new design file is uploaded automatically. Drive keeps the last 30 backups.</p>
+          <div class="d-flex gap-2">
+            <form method="post" action="{{ url_for('settings.gdrive_sync') }}"><button class="btn btn-sm btn-brand">Upload now</button></form>
+            <form method="post" action="{{ url_for('settings.gdrive_disconnect') }}" data-confirm="Disconnect Google Drive? Files already in your Drive stay there.">
+              <button class="btn btn-sm btn-outline-danger">Disconnect</button>
+            </form>
+          </div>
+        {% elif drive.has_client %}
+          <p class="small">Google client added. Click below, choose your Google account and allow access.</p>
+          <div class="d-flex gap-2 align-items-center">
+            <a class="btn btn-sm btn-brand" href="{{ url_for('settings.gdrive_connect') }}">Connect Google Drive</a>
+            <form method="post" action="{{ url_for('settings.gdrive_remove_client') }}" data-confirm="Remove the Google client file?">
+              <button class="btn btn-sm btn-link text-muted">Remove client file</button>
+            </form>
+          </div>
+          {% if drive.last_error %}<div class="alert alert-danger py-2 small mt-2">{{ drive.last_error }}</div>{% endif %}
+          <p class="small text-muted mt-2 mb-0">If Google shows “Google hasn’t verified this app”, click <strong>Advanced → Go to TUR fitgear</strong>. It is your own app.</p>
+        {% else %}
+          <p class="small text-muted">Upload backups and design files straight to your Google Drive, with no Drive app needed on this PC. The app can only see the files it creates, not the rest of your Drive. One-time setup, about 10 minutes, free:</p>
+          <ol class="small ps-3">
+            <li>Open <strong>console.cloud.google.com</strong> with your personal Google account and create a project, e.g. “TUR fitgear”.</li>
+            <li><strong>APIs &amp; Services → Library</strong>: search <strong>Google Drive API</strong> and click <strong>Enable</strong>.</li>
+            <li><strong>OAuth consent screen</strong> (Google Auth Platform): app name “TUR fitgear”, your email, audience <strong>External</strong>. Then under <strong>Audience</strong> click <strong>Publish app</strong>, otherwise access expires every 7 days.</li>
+            <li><strong>Clients → Create client</strong>: application type <strong>Desktop app</strong>, name “TUR fitgear”, then <strong>Create</strong> and <strong>Download JSON</strong>.</li>
+            <li>Choose that file below and click <strong>Save client</strong>, then <strong>Connect Google Drive</strong>.</li>
+          </ol>
+          <form method="post" action="{{ url_for('settings.gdrive_client') }}" enctype="multipart/form-data" class="d-flex gap-2">
+            <input type="file" name="client" accept=".json,application/json" class="form-control form-control-sm" required aria-label="Google client JSON file">
+            <button class="btn btn-sm btn-brand text-nowrap">Save client</button>
+          </form>
+          <p class="small text-muted mt-2 mb-0">Open the app at <code>{{ app_url }}</code> when connecting; Google sends you back to this address.</p>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -25,7 +25,7 @@ An internal web app for managing sportswear and jersey orders: customers, size s
 | **Statements** | Printable statement per customer or vendor, plus text you can copy into WhatsApp |
 | **Reports** | Every order grouped by year (billed, spent, received, profit, profit %) with Excel download |
 | **Old reports** | Import older Excel/CSV order sheets: columns are guessed, you confirm with a preview, and the rows are imported. Read locally, no internet |
-| **Settings** | Size scale; **backup folder** (e.g. a Google Drive folder; design files are copied there too); backup now; download the latest backup or the design files as a zip; full Excel export; change password; stop the app |
+| **Settings** | Size scale; **Connect Google Drive** (direct upload of every backup and design file through the Drive API, no Drive app needed); **backup folder** (e.g. a Google Drive for desktop folder); backup now; download the latest backup or the design files as a zip; full Excel export; change password; stop the app |
 
 Money rules (always calculated, never typed in):
 
@@ -75,6 +75,18 @@ Then stop the app and run `start.bat` again. Your data is not stored in this fol
 `backups\` and `uploads\` hold real business data and are **git-ignored**.
 
 **Restore a backup:** stop the app, copy a backup file over `tur_fitgear.db` in the data folder, then start again.
+
+### Google Drive (direct link, no Drive app needed)
+
+**Settings → Google Drive** uploads every backup (on start, daily, on stop) and every new design file to a **“TUR fitgear backups”** folder in your Drive, keeping the last 30 backups. It uses the narrow `drive.file` permission, so the app can only see files it created. One-time setup with your own Google account:
+
+1. In [Google Cloud console](https://console.cloud.google.com), create a project, e.g. “TUR fitgear”.
+2. **APIs & Services → Library** → enable **Google Drive API**.
+3. **OAuth consent screen**: app name, your email, audience **External**; then **Audience → Publish app**. If it stays in *Testing*, access expires every 7 days.
+4. **Clients → Create client** → **Desktop app** → **Download JSON**.
+5. In the app: **Settings → Google Drive** → choose the JSON → **Save client** → **Connect Google Drive**. If Google says the app isn't verified, choose **Advanced → Go to TUR fitgear**; it's your own app.
+
+The client file and sign-in token are kept in the data folder (`gdrive_client.json`, `gdrive_token.json`). They are never synced, never in database backups, and never in git. **Disconnect** revokes the access at Google.
 
 Optional environment variables: `TUR_DATA_DIR`, `TUR_BACKUP_DIR`, `TUR_UPLOAD_DIR`, `TUR_PORT` (default 5000), `TUR_HOST` (set `0.0.0.0` to allow phone access on the same Wi-Fi), `TUR_NO_BROWSER=1`.
 

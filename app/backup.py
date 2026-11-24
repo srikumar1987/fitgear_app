@@ -42,8 +42,11 @@ def check_backup_dir(app, folder: str) -> Path:
     return path
 
 
-def make_backup(app) -> Path:
-    """Copy the live database using SQLite's online backup API (safe while the app is running)."""
+def make_backup(app, cloud: bool = True) -> Path:
+    """Copy the live database using SQLite's online backup API (safe while the app is running).
+
+    When Google Drive is connected the copy is also uploaded (in the background) unless cloud=False.
+    """
     dest_dir = backup_dir(app)
     dest_dir.mkdir(parents=True, exist_ok=True)
     stamp = f"{PREFIX}{datetime.now():%Y%m%d_%H%M%S}"
@@ -63,6 +66,13 @@ def make_backup(app) -> Path:
     if custom_backup_dir():
         mirror_uploads(app, dest_dir)
     app.config["LAST_BACKUP_DAY"] = date.today()
+    if cloud:
+        from . import gdrive
+
+        data_dir = Path(app.config["DATA_DIR"])
+        if gdrive.is_connected(data_dir):
+            args = (data_dir, dest, Path(app.config["UPLOAD_DIR"]))
+            gdrive.safe_sync(*args) if app.testing else gdrive.sync_in_background(*args)
     return dest
 
 
