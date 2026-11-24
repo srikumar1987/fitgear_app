@@ -200,6 +200,17 @@
     }
   });
 
+  // Quotation card: show / hide columns before taking a snap for the customer.
+  document.addEventListener("change", function (e) {
+    var box = e.target.closest ? e.target.closest("[data-quote-col]") : null;
+    if (!box) return;
+    var tools = box.closest("[data-quote-tools]");
+    var card = tools && tools.nextElementSibling;
+    if (card && card.hasAttribute("data-quote-card")) {
+      card.classList.toggle("hide-" + box.dataset.quoteCol, !box.checked);
+    }
+  });
+
   // Copy-to-clipboard buttons (statements for WhatsApp).
   document.addEventListener("click", function (e) {
     var btn = e.target.closest("[data-copy]");

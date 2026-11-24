@@ -12,6 +12,7 @@ from ..formatting import format_inr
 from ..models import (
     ALLOCATION_STATUSES, FILE_KINDS, ORDER_STATUSES, PAYMENT_MODES, PRICE_TYPES, ZERO,
     Adjustment, AllocationLine, Customer, Order, OrderItem, Quotation, SizeRow, Transaction, Vendor, VendorAllocation, audit,
+    to_decimal,
 )
 from ..money import alloc_due, alloc_paid, customer_payment_type, order_money
 from ..sizes import (
@@ -93,6 +94,23 @@ def quotation_lines(order: Order) -> list[dict]:
     ]
 
 
+def quote_columns(lines: list[dict]) -> dict:
+    """Which quotation columns have something to show (empty ones are hidden by default)."""
+    def has_money(line, key):
+        return to_decimal(line.get(key)) != ZERO
+
+    return {
+        "rate": any(l["price_type"] != "lump_sum" for l in lines),
+        "lump": any(l["price_type"] != "per_piece" and has_money(l, "lump_amount") for l in lines),
+        "details": any((l.get("attributes") or "").strip() for l in lines),
+    }
+
+
+def _quote_context(order: Order, lines: list[dict], total, notes: str, version=None, when=None) -> dict:
+    return {"order": order, "lines": lines, "total": total, "notes": notes, "version": version,
+            "when": when or date.today(), "cols": quote_columns(lines)}
+
+
 def ledger_rows(order: Order) -> list[tuple[Transaction, object]]:
     balance, rows = ZERO, []
     for txn in order.transactions:
@@ -166,7 +184,9 @@ def detail(order_id: int):
         scale = get_scale()
         ctx.update(scale=scale, summary=size_summary(order, scale), warnings=validate_order(order, scale))
     elif tab == "quotation":
-        ctx.update(draft_lines=quotation_lines(order))
+        lines = quotation_lines(order)
+        notes = order.quotations[-1].notes if order.quotations else ""
+        ctx.update(draft_lines=lines, quote=_quote_context(order, lines, ctx["m"].items_total, notes))
     elif tab == "designs":
         ctx.update(file_kinds=FILE_KINDS)
     elif tab == "vendors":
@@ -574,7 +594,17 @@ def quotation_approve(quotation_id: int):
 @bp.get("/quotations/<int:quotation_id>")
 def quotation_print(quotation_id: int):
     quote = db.get_or_404(Quotation, quotation_id)
-    return render_template("orders/quotation_print.html", q=quote, order=quote.order, price_types=PRICE_TYPES)
+    return render_template("orders/quote_share.html", **_quote_context(
+        quote.order, quote.lines, quote.total, quote.notes, quote.version, quote.created_at.date()))
+
+
+@bp.get("/orders/<int:order_id>/quote-card")
+def quote_draft_share(order_id: int):
+    """The current items as a customer-ready card, for a screenshot or PDF."""
+    order = db.get_or_404(Order, order_id)
+    notes = order.quotations[-1].notes if order.quotations else ""
+    return render_template("orders/quote_share.html", **_quote_context(
+        order, quotation_lines(order), order_money(order).items_total, notes))
 
 
 # ---------------------------------------------------------------- order payments

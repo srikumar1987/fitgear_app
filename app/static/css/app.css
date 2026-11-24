@@ -133,6 +133,55 @@ tr.row-link:hover td { background: #FAFAF7; }
 .year-group[open] > summary::before { transform: rotate(90deg); }
 .year-group .year { font-size: 1.15rem; font-weight: 700; }
 
+/* customer quotation card */
+.quote-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.quote-tools label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+.quote-card {
+  max-width: 640px; background: #fff; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 6px 24px rgba(31, 35, 40, .12); border: 1px solid var(--border);
+}
+.qc-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  background: var(--ink); color: #fff; padding: 18px 22px; border-bottom: 4px solid var(--gold);
+}
+.qc-logo { width: 92px; }
+.qc-title { color: var(--gold); font-weight: 800; letter-spacing: .14em; font-size: 1.15rem; }
+.qc-meta { font-size: .8rem; color: #CBD5E1; }
+.qc-to { padding: 16px 22px 8px; }
+.qc-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.qc-customer { font-size: 1.2rem; font-weight: 700; }
+.qc-order { font-size: .85rem; color: var(--muted); }
+.qc-table { width: calc(100% - 44px); margin: 8px 22px 0; border-collapse: collapse; font-size: .9rem; }
+.qc-table th {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  border-bottom: 2px solid var(--gold); padding: 8px 6px; font-weight: 700;
+}
+.qc-table td { padding: 10px 6px; border-bottom: 1px solid #F0F1F3; vertical-align: top; }
+.qc-table tbody tr:nth-child(even) td { background: #FAFAF7; }
+.qc-item { font-weight: 600; }
+.qc-details { font-size: .78rem; color: var(--muted); }
+.qc-amount { font-weight: 700; }
+.qc-total {
+  display: flex; justify-content: space-between; align-items: center; margin: 14px 22px 4px;
+  background: var(--ink); color: #fff; border-radius: 10px; padding: 12px 16px;
+}
+.qc-total span { text-transform: uppercase; letter-spacing: .1em; font-size: .8rem; color: #CBD5E1; }
+.qc-total strong { color: var(--gold); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.qc-notes { margin: 10px 22px 0; font-size: .85rem; background: #FFFBEB; border-left: 3px solid var(--gold); padding: 8px 12px; border-radius: 6px; }
+.qc-foot { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 14px 22px 18px; font-size: .8rem; color: var(--muted); }
+.qc-turtle { width: 22px; }
+.quote-card.hide-rate .col-rate, .quote-card.hide-lump .col-lump,
+.quote-card.hide-details .col-details, .quote-card.hide-notes .col-notes { display: none; }
+.quote-page { background: #ECEEF1; }
+.quote-share { max-width: 680px; margin: 20px auto; padding: 0 12px; }
+.quote-share .quote-tools { justify-content: center; }
+.quote-share .quote-card { margin: 0 auto; }
+@media print {
+  .quote-page { background: #fff; }
+  .quote-card { box-shadow: none; border: 0; max-width: none; }
+  .qc-head, .qc-total { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
 /* designs */
 .paste-zone {
   border: 2px dashed #C7CBD1; border-radius: 8px; padding: 10px; background: #fff; cursor: pointer;

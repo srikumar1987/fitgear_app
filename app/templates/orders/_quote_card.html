@@ -1,0 +1,63 @@
+{# Customer-facing quotation card. Needs: order, lines, total, notes, version, when, cols. #}
+<div class="quote-tools no-print" data-quote-tools>
+  <span class="small text-muted me-1">Show:</span>
+  <label class="small"><input type="checkbox" data-quote-col="rate" {{ 'checked' if cols.rate }}> Rate</label>
+  <label class="small"><input type="checkbox" data-quote-col="lump" {{ 'checked' if cols.lump }}> Lump sum</label>
+  <label class="small"><input type="checkbox" data-quote-col="details" {{ 'checked' if cols.details }}> Details</label>
+  <label class="small"><input type="checkbox" data-quote-col="notes" {{ 'checked' if notes }}> Notes</label>
+</div>
+<div class="quote-card {{ '' if cols.rate else 'hide-rate' }} {{ '' if cols.lump else 'hide-lump' }} {{ '' if cols.details else 'hide-details' }} {{ '' if notes else 'hide-notes' }}" data-quote-card>
+  <div class="qc-head">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="TUR fitgear" class="qc-logo">
+    <div class="text-end">
+      <div class="qc-title">QUOTATION</div>
+      <div class="qc-meta">{{ order.number }}{% if version %} · v{{ version }}{% endif %}</div>
+      <div class="qc-meta">{{ when|d }}</div>
+    </div>
+  </div>
+
+  <div class="qc-to">
+    <div class="qc-label">Prepared for</div>
+    <div class="qc-customer">{{ order.customer.name }}</div>
+    <div class="qc-order">{{ order.title }}</div>
+  </div>
+
+  <table class="qc-table">
+    <thead><tr>
+      <th>Item</th><th class="num">Qty</th><th class="num col-rate">Rate</th><th class="num col-lump">Lump sum</th><th class="num">Amount</th>
+    </tr></thead>
+    <tbody>
+    {% for line in lines %}
+      <tr>
+        <td>
+          <div class="qc-item">{{ line.name }}</div>
+          {% if line.attributes %}<div class="qc-details col-details">{{ line.attributes }}</div>{% endif %}
+        </td>
+        <td class="num">{{ line.qty }}</td>
+        <td class="num col-rate">{{ line.unit_price|inr if line.price_type != 'lump_sum' else '-' }}</td>
+        <td class="num col-lump">{{ line.lump_amount|inr if line.price_type != 'per_piece' else '-' }}</td>
+        <td class="num qc-amount">{{ line.total|inr }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="text-muted">No items yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="qc-total">
+    <span>Total</span>
+    <strong>{{ total|inr }}</strong>
+  </div>
+
+  {% if notes %}
+  <div class="qc-notes col-notes">
+    <div class="qc-label">Notes</div>
+    <div style="white-space: pre-line">{{ notes }}</div>
+  </div>
+  {% endif %}
+
+  <div class="qc-foot">
+    <img src="{{ url_for('static', filename='img/turtle.png') }}" alt="" class="qc-turtle">
+    <span>Thank you for choosing <strong>TUR fitgear</strong></span>
+  </div>
+</div>
