@@ -20,6 +20,22 @@ if not exist "%VENV%\Scripts\python.exe" (
 echo Checking packages...
 "%VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r requirements.txt || goto :error
 
+rem Already running? Reuse it if it is this version; restart it if it is older (after an update).
+"%VENV%\Scripts\python.exe" run.py --check
+if errorlevel 11 (
+  echo.
+  echo An older version of TUR fitgear is still running.
+  echo In the app, open Settings and click "Stop the app", then run start.bat again.
+  pause
+  goto :eof
+)
+if errorlevel 10 (
+  echo.
+  echo TUR fitgear is already running at http://localhost:%TUR_PORT% and has opened in your browser.
+  ping -n 4 127.0.0.1 >nul
+  goto :eof
+)
+
 rem Run the app in the background (no console), so Ctrl+C or clicking a window cannot stop or freeze it.
 start "" "%VENV%\Scripts\pythonw.exe" run.py
 
