@@ -15,7 +15,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from sqlalchemy import or_, select
 
-from .. import db
+from .. import db, gdrive, gsheets
 from ..models import ZERO, Customer, OldImport, OldOrder, Order, audit
 from ..money import OrderMoney, order_money
 from ..old_import import (
@@ -250,14 +250,35 @@ def old_upload():
             flash("Choose an Excel (.xlsx) or CSV file. Old .xls files: open in Excel and 'Save As' .xlsx first.",
                   "danger")
             return redirect(url_for("reports.old_upload"))
-        cutoff = time.time() - 86400
-        for stale in _import_dir().glob("*"):
-            if stale.stat().st_mtime < cutoff:
-                stale.unlink(missing_ok=True)
+        _clean_imports()
         token = uuid4().hex
         upload.save(_import_dir() / f"{token}{ext}")
         return redirect(url_for("reports.old_map", token=token, name=Path(upload.filename).name))
-    return render_template("reports/old_upload.html")
+    data_dir = Path(current_app.config["DATA_DIR"])
+    return render_template("reports/old_upload.html", drive_connected=gdrive.is_connected(data_dir),
+                           sheets_access=gdrive.has_sheets_access(data_dir))
+
+
+def _clean_imports() -> None:
+    cutoff = time.time() - 86400
+    for stale in _import_dir().glob("*"):
+        if stale.stat().st_mtime < cutoff:
+            stale.unlink(missing_ok=True)
+
+
+@bp.post("/reports/old/import/sheet")
+def old_sheet():
+    """Read a Google Sheet (via Google login or a shared link) into the same preview as an upload."""
+    _clean_imports()
+    token = uuid4().hex
+    dest = _import_dir() / f"{token}.xlsx"
+    try:
+        name = gsheets.fetch(Path(current_app.config["DATA_DIR"]), request.form.get("link", ""), dest)
+    except gdrive.DriveError as exc:
+        dest.unlink(missing_ok=True)
+        flash(str(exc), "danger")
+        return redirect(url_for("reports.old_upload"))
+    return redirect(url_for("reports.old_map", token=token, name=name))
 
 
 @bp.get("/reports/old/import/<token>")

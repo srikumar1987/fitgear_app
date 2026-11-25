@@ -98,6 +98,8 @@
             <dt class="col-sm-4">Drive folder</dt><dd class="col-sm-8">“{{ drive.folder }}” (with an “uploads” folder for design files)</dd>
             <dt class="col-sm-4">Last upload</dt><dd class="col-sm-8">{{ drive.last_sync.replace('T', ' ') if drive.last_sync else 'Not yet' }}{% if drive.last_backup %} · {{ drive.last_backup }}{% endif %}</dd>
             <dt class="col-sm-4">Design files uploaded</dt><dd class="col-sm-8">{{ drive.uploaded_files }}</dd>
+            <dt class="col-sm-4">Read Google Sheets</dt>
+            <dd class="col-sm-8">{% if drive.sheets %}<span class="text-paid">Allowed</span> (for Old reports import){% else %}<span class="text-soon">Not allowed</span>. Disconnect and connect again, and tick the Google Sheets box{% endif %}</dd>
           </dl>
           {% if drive.last_error %}<div class="alert alert-danger py-2 small">Last upload failed: {{ drive.last_error }}</div>{% endif %}
           <p class="small text-muted">Every backup (on start, daily and on stop) and every new design file is uploaded automatically. Drive keeps the last 30 backups.</p>
@@ -122,7 +124,7 @@
           <p class="small text-muted">Upload backups and design files straight to your Google Drive, with no Drive app needed on this PC. The app can only see the files it creates, not the rest of your Drive. One-time setup, about 10 minutes, free:</p>
           <ol class="small ps-3">
             <li>Open <strong>console.cloud.google.com</strong> with your personal Google account and create a project, e.g. “TUR fitgear”.</li>
-            <li><strong>APIs &amp; Services → Library</strong>: search <strong>Google Drive API</strong> and click <strong>Enable</strong>.</li>
+            <li><strong>APIs &amp; Services → Library</strong>: search <strong>Google Drive API</strong> and click <strong>Enable</strong>. Do the same for <strong>Google Sheets API</strong> (used only to read old sheets for Old reports).</li>
             <li><strong>OAuth consent screen</strong> (Google Auth Platform): app name “TUR fitgear”, your email, audience <strong>External</strong>. Then under <strong>Audience</strong> click <strong>Publish app</strong>, otherwise access expires every 7 days.</li>
             <li><strong>Clients → Create client</strong>: application type <strong>Desktop app</strong>, name “TUR fitgear”, then <strong>Create</strong> and <strong>Download JSON</strong>.</li>
             <li>Choose that file below and click <strong>Save client</strong>, then <strong>Connect Google Drive</strong>.</li>

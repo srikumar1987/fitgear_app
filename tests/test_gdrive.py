@@ -25,6 +25,10 @@ class FakeGoogle:
         self.verifiers = []
         self.granted = gdrive.SCOPES             # what the user ticked on Google's consent page
         self.token_scope_ok = True               # whether issued tokens can really use Drive
+        self.sheets = {}                         # sheet id -> {"title", "tabs": {tab: rows}}
+        self.public_sheets = {}                  # sheet id -> xlsx bytes ("Anyone with the link")
+        self.sheets_api_on = True
+        self.sheet_calls = []
 
     def _id(self):
         self.n += 1
@@ -58,6 +62,27 @@ class FakeGoogle:
             fid = self._id()
             self.files[fid] = {**meta, "content": data, "mime": headers["Content-Type"], "trashed": False, "order": self.n}
             return ok({"id": fid})
+        if url.startswith("https://docs.google.com/spreadsheets/d/"):
+            sid = parsed.path.split("/")[3]
+            if sid in self.public_sheets:
+                return 200, {}, self.public_sheets[sid]
+            return 200, {}, b"<html>Sign in - Google Accounts</html>"     # private sheet: login page
+        if url.startswith("https://sheets.googleapis.com/v4/spreadsheets/"):
+            assert headers.get("Authorization", "").startswith("Bearer ")
+            self.sheet_calls.append(url)
+            if not self.sheets_api_on:
+                return ok({"error": {"code": 403, "status": "PERMISSION_DENIED", "message":
+                                     "Google Sheets API has not been used in project 1 before or it is disabled."}}, 403)
+            sid = parsed.path.split("/")[3]          # /v4/spreadsheets/<id>[/values:batchGet]
+            if sid not in self.sheets:
+                return ok({"error": {"code": 404, "message": "Requested entity was not found."}}, 404)
+            sheet = self.sheets[sid]
+            if parsed.path.endswith("values:batchGet"):
+                ranges = parse_qs(parsed.query)["ranges"]
+                assert parse_qs(parsed.query)["valueRenderOption"] == ["UNFORMATTED_VALUE"]
+                return ok({"valueRanges": [{"values": sheet["tabs"][r.strip("'").replace("''", "'")]} for r in ranges]})
+            return ok({"properties": {"title": sheet["title"]},
+                       "sheets": [{"properties": {"title": t}} for t in sheet["tabs"]]})
         assert headers and headers.get("Authorization", "").startswith("Bearer ")
         if not self.token_scope_ok:
             return ok({"error": {"code": 403, "message": "Request had insufficient authentication scopes.",

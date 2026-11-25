@@ -51,7 +51,8 @@
         <span class="d-flex gap-2">
           <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.old_upload') }}">Choose another file</a>
           <button class="btn btn-sm btn-outline-secondary">Update preview</button>
-          <button class="btn btn-sm btn-brand" formmethod="post" formaction="{{ url_for('reports.old_confirm', token=token) }}" {{ 'disabled' if not parsed }}>Import {{ parsed|length }} rows</button>
+          <button class="btn btn-sm btn-brand" formmethod="post" formaction="{{ url_for('reports.old_confirm', token=token) }}" {{ 'disabled' if not parsed }}
+                  onclick="return confirm('Add {{ parsed|length }} rows from {{ name|e }} to Old reports? Check the preview below first. You can remove this import later.')">Import {{ parsed|length }} rows</button>
         </span>
       </div>
     </div>

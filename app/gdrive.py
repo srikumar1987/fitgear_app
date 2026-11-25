@@ -30,7 +30,8 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 API_URL = "https://www.googleapis.com/drive/v3/files"
 UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
-SCOPES = "openid email https://www.googleapis.com/auth/drive.file"
+SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly"
+SCOPES = f"openid email https://www.googleapis.com/auth/drive.file {SHEETS_SCOPE}"
 FOLDER_NAME = "TUR fitgear backups"
 FOLDER_MIME = "application/vnd.google-apps.folder"
 BACKUP_PREFIX = "tur_fitgear_"
@@ -157,11 +158,22 @@ def is_connected(data_dir: Path) -> bool:
     return bool(_read(_files(data_dir)[1]).get("refresh_token"))
 
 
+def has_sheets_access(data_dir: Path) -> bool:
+    """Connected with the read-only Google Sheets permission (connections made before it was added don't have it)."""
+    token = _read(_files(data_dir)[1])
+    return bool(token.get("refresh_token")) and SHEETS_SCOPE in token.get("scope", "").split()
+
+
+def access_token(data_dir: Path) -> str:
+    return _access_token(data_dir)
+
+
 def status(data_dir: Path) -> dict:
     client, token, state = (_read(p) for p in _files(data_dir))
     return {
         "has_client": bool(client.get("client_id")),
         "connected": bool(token.get("refresh_token")),
+        "sheets": SHEETS_SCOPE in token.get("scope", "").split(),
         "email": token.get("email", ""),
         "connected_at": token.get("connected_at", ""),
         "folder": FOLDER_NAME,
@@ -217,6 +229,7 @@ def connect(data_dir: Path, code: str, redirect_uri: str, verifier: str) -> str:
     email = _email_from_id_token(tokens.get("id_token", ""))
     _, token_file, state_file = _files(data_dir)
     _write(token_file, {"refresh_token": tokens["refresh_token"], "email": email,
+                        "scope": granted if granted is not None else SCOPES,
                         "connected_at": datetime.now().isoformat(timespec="seconds")})
     _access[str(data_dir)] = (tokens.get("access_token", ""), time.time() + int(tokens.get("expires_in", 0)) - 60)
     _write(state_file, {})
