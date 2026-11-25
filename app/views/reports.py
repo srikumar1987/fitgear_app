@@ -19,7 +19,7 @@ from .. import db, gdrive, gsheets
 from ..models import ZERO, Customer, OldImport, OldOrder, Order, audit
 from ..money import OrderMoney, order_money
 from ..old_import import (
-    FIELDS, MONEY_FIELDS, column_letter, find_header, guess_mapping, parse_rows, read_sheet, sheet_overview, to_text,
+    FIELDS, MONEY_FIELDS, build_template, column_letter, find_header, guess_mapping, parse_rows, read_sheet, sheet_overview, to_text,
 )
 
 bp = Blueprint("reports", __name__)
@@ -264,6 +264,13 @@ def _clean_imports() -> None:
     for stale in _import_dir().glob("*"):
         if stale.stat().st_mtime < cutoff:
             stale.unlink(missing_ok=True)
+
+
+@bp.get("/reports/old/sample")
+def old_sample():
+    return send_file(BytesIO(build_template()), as_attachment=True,
+                     download_name="TUR_fitgear_old_orders_template.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @bp.post("/reports/old/import/sheet")

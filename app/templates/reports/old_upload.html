@@ -39,6 +39,7 @@
           <input type="file" name="file" accept=".xlsx,.xlsm,.csv" class="form-control" required aria-label="Excel file">
           <button class="btn btn-outline-secondary text-nowrap">Upload and preview</button>
         </form>
+        <p class="small text-muted">Easiest: <a href="{{ url_for('reports.old_sample') }}">download the sample Excel</a>, copy your old orders into its “Orders” sheet in the same columns, and upload it here.</p>
         <p class="small text-muted mb-0">From Google Sheets: File → Download → Microsoft Excel (.xlsx). Old .xls files: open in Excel and “Save As” .xlsx.</p>
       </div>
     </div>

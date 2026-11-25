@@ -96,6 +96,80 @@ def read_sheet(path: Path, sheet: str | None = None) -> tuple[list[str], str, li
     return names, chosen, cleaned
 
 
+TEMPLATE_COLUMNS = [
+    # header, width, format, help text
+    ("Order ID", 12, None, "Optional. Your old order / bill number, e.g. 101 or INV-2024-07."),
+    ("Order name", 28, None, "What the order was called, e.g. 'League jerseys 2024'. Needed (or Customer)."),
+    ("Customer / team", 24, None, "Team or customer name, e.g. 'Vintage Warriors'."),
+    ("What was ordered", 34, None, "Optional. e.g. 'Jersey half sleeve × 20, Track pants × 20'."),
+    ("Order date", 14, "DD-MM-YYYY", "Date of the order (DD-MM-YYYY). Used to group by year. No exact date? Use the 1st of the month."),
+    ("Billed", 14, "#,##0.00", "Total billed to the customer, in ₹ (numbers only, no ₹ sign needed)."),
+    ("Spent", 14, "#,##0.00", "What you paid vendors plus other costs (courier, design…), in ₹."),
+    ("Received", 14, "#,##0.00", "What the customer actually paid, in ₹."),
+    ("Profit", 14, "#,##0.00", "Optional. Leave empty and it is worked out as Billed − Spent."),
+]
+TEMPLATE_EXAMPLE = [
+    ["101", "League jerseys 2024", "Vintage Warriors", "Jersey half sleeve × 9, full sleeve × 14", date(2024, 3, 5),
+     11500, 7000, 11500, None],
+    ["102", "Cricket whites", "Blue Tigers", "Whites × 15, Track pants × 15", date(2024, 8, 12), 18000, 12500, 15000, None],
+]
+
+
+def build_template() -> bytes:
+    """The sample Excel for Old reports: an 'Orders' sheet to fill, and a 'How to fill' sheet with an example."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    gold, ink = PatternFill("solid", fgColor="FDB913"), PatternFill("solid", fgColor="1F2328")
+    wb = Workbook()
+    orders = wb.active
+    orders.title = "Orders"
+    orders.append([c[0] for c in TEMPLATE_COLUMNS])
+    for idx, (_, width, fmt, _help) in enumerate(TEMPLATE_COLUMNS, start=1):
+        letter = column_letter(idx - 1)
+        orders.column_dimensions[letter].width = width
+        cell = orders.cell(row=1, column=idx)
+        cell.font, cell.fill = Font(bold=True, color="1F2328"), gold
+        if fmt:
+            for row in range(2, 1001):
+                orders.cell(row=row, column=idx).number_format = fmt
+    orders.freeze_panes = "A2"
+
+    guide = wb.create_sheet("How to fill")
+    guide["A1"] = "TUR fitgear: old orders template"
+    guide["A1"].font = Font(bold=True, size=14)
+    guide["A2"] = ("Fill one row per order on the 'Orders' sheet, then in the app go to Reports → Old reports → "
+                   "Upload Excel / CSV and choose the 'Orders' sheet. You will see a preview before anything is added.")
+    guide["A2"].alignment = Alignment(wrap_text=True)
+    guide.merge_cells("A2:I2")
+    guide.row_dimensions[2].height = 32
+    guide.append([])
+    guide.append(["Column", "What to enter"])
+    for cell in guide[4]:
+        cell.font, cell.fill = Font(bold=True, color="FFFFFF"), ink
+    for header, _w, _f, help_text in TEMPLATE_COLUMNS:
+        guide.append([header, help_text])
+    guide.append([])
+    guide.append(["Example (copy the style, not these rows):"])
+    guide.cell(row=guide.max_row, column=1).font = Font(bold=True)
+    guide.append([c[0] for c in TEMPLATE_COLUMNS])
+    for cell in guide[guide.max_row]:
+        cell.font, cell.fill = Font(bold=True, color="1F2328"), gold
+    for example in TEMPLATE_EXAMPLE:
+        guide.append(example)
+        guide.cell(row=guide.max_row, column=5).number_format = "DD-MM-YYYY"
+    guide.column_dimensions["A"].width = 20
+    guide.column_dimensions["B"].width = 90
+    for letter in "CDEFGHI":
+        guide.column_dimensions[letter].width = 16
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
 def sheet_overview(path: Path) -> list[dict]:
     """Every tab with its number of filled rows and the header cells, for the 'which sheet?' step."""
     names, _, _ = read_sheet(path)
