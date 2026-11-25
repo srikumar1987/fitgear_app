@@ -19,7 +19,7 @@ from .. import db, gdrive, gsheets
 from ..models import ZERO, Customer, OldImport, OldOrder, Order, audit
 from ..money import OrderMoney, order_money
 from ..old_import import (
-    FIELDS, MONEY_FIELDS, column_letter, find_header, guess_mapping, parse_rows, read_sheet, to_text,
+    FIELDS, MONEY_FIELDS, column_letter, find_header, guess_mapping, parse_rows, read_sheet, sheet_overview, to_text,
 )
 
 bp = Blueprint("reports", __name__)
@@ -285,6 +285,11 @@ def old_sheet():
 def old_map(token: str):
     path = _import_path(token)
     try:
+        if not request.args.get("sheet"):
+            overview = sheet_overview(path)
+            if len(overview) > 1:  # several tabs: ask which one first
+                return render_template("reports/old_pick_sheet.html", token=token, overview=overview,
+                                       name=request.args.get("name", path.name))
         sheets, sheet, rows = read_sheet(path, request.args.get("sheet"))
     except Exception as exc:  # unreadable or corrupt file: tell the user instead of a server error
         path.unlink(missing_ok=True)

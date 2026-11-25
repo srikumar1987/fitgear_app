@@ -96,6 +96,18 @@ def read_sheet(path: Path, sheet: str | None = None) -> tuple[list[str], str, li
     return names, chosen, cleaned
 
 
+def sheet_overview(path: Path) -> list[dict]:
+    """Every tab with its number of filled rows and the header cells, for the 'which sheet?' step."""
+    names, _, _ = read_sheet(path)
+    overview = []
+    for name in names:
+        _, _, rows = read_sheet(path, name)
+        header = rows[find_header(rows)] if rows else []
+        columns = [to_text(c) for c in header if to_text(c)]
+        overview.append({"name": name, "rows": len(rows), "columns": columns[:8], "more": max(0, len(columns) - 8)})
+    return overview
+
+
 def find_header(rows: list[list]) -> int:
     """The header is the row (within the first 15) that matches the most known column names."""
     best, best_score = 0, 1

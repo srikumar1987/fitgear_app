@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Choose a sheet{% endblock %}
+{% block content %}
+<h1 class="page-title mb-2">Reports</h1>
+{% include "reports/_tabs.html" %}
+<div class="card" style="max-width: 900px">
+  <div class="card-body">
+    <h2 class="card-title">{{ name }}: which sheet should be imported?</h2>
+    <p class="small text-muted">This file has {{ overview|length }} sheets (tabs). Pick the one with your old orders; you will see a preview before anything is added. To import another sheet later, run the import again and pick it.</p>
+    <table class="table table-hover">
+      <thead><tr><th>Sheet</th><th class="num">Rows</th><th>Columns found</th><th></th></tr></thead>
+      <tbody>
+      {% for s in overview %}
+        {% set url = url_for('reports.old_map', token=token, sheet=s.name, name=name) %}
+        <tr class="row-link" onclick="location.href='{{ url }}'">
+          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="num">{{ s.rows }}</td>
+          <td class="small text-muted">{{ s.columns|join(' · ') or '(empty)' }}{% if s.more %} · +{{ s.more }} more{% endif %}</td>
+          <td class="text-end"><a class="btn btn-sm {{ 'btn-brand' if s.rows > 1 else 'btn-outline-secondary' }}" href="{{ url }}">Use this sheet</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.old') }}">Cancel</a>
+  </div>
+</div>
+{% endblock %}

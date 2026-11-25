@@ -46,7 +46,10 @@ def test_read_with_google_login_then_preview_and_confirm(file_app, file_client, 
 
     r = file_client.post("/reports/old/import/sheet", data={"link": LINK})
     assert "/reports/old/import/" in r.headers["Location"]
-    page = file_client.get(r.headers["Location"]).get_data(as_text=True)
+    picker = file_client.get(r.headers["Location"]).get_data(as_text=True)     # 2 tabs: choose one first
+    assert "which sheet should be imported" in picker and "Bob&#39;s tab" in picker
+    assert "Order Name" in picker and "rows ready" not in picker
+    page = file_client.get(r.headers["Location"] + "&sheet=2024").get_data(as_text=True)
     assert "Orders 2024 (Google Sheet)" in page and "2</strong> rows ready" in page and "Vintage Warriors" in page
     assert "return confirm(" in page                                    # Import asks before saving
     assert db.session.query(OldOrder).count() == 0                      # nothing saved by the preview
